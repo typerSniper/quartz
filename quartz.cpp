@@ -34,7 +34,7 @@ extern "C" long unsigned int load_eqset_ (const char* eqset_fn_, unsigned char**
   return eccs.size();
 }
 
-std::vector<GraphXfer *> filter_greedy (Context * ctxt, std::vector<std::vector<CircuitSeq *>>  eccs) {
+std::vector<GraphXfer *> filter_greedy (Context * ctxt, std::vector<std::vector<CircuitSeq *>>& eccs) {
   std::vector<GraphXfer *> xfers;
   for (const auto &ecc : eccs) {
     const int ecc_size = (int)ecc.size();
