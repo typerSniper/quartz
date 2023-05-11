@@ -38,13 +38,13 @@ std::vector<GraphXfer *> filter_greedy (Context * ctxt, std::vector<std::vector<
   std::vector<GraphXfer *> xfers;
   for (const auto &ecc : eccs) {
     const int ecc_size = (int)ecc.size();
-    std::vector<Graph>* graphs = new std::vector<Graph>[ecc_size];
+    std::vector<Graph> graphs;
     std::vector<int> graph_cost;
-    // graphs.reserve(ecc_size);
+    graphs.reserve(ecc_size);
     graph_cost.reserve(ecc_size);
     for (auto &circuit : ecc) {
-      graphs->emplace_back(ctxt, circuit);
-      graph_cost.emplace_back(gcost_function(&(graphs->back())));
+      graphs.emplace_back(ctxt, circuit);
+      graph_cost.emplace_back(gcost_function(&(graphs.back())));
     }
     int representative_id =
         (int)(std::min_element(graph_cost.begin(), graph_cost.end()) -
