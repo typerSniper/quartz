@@ -211,14 +211,14 @@ public:
    * @return The optimized circuit.
    */
   std::shared_ptr<Graph>
-  greedy_optimize_with_xfers(Context *ctx, const std::vector<GraphXfer *> &xfers,
+  greedy_optimize_with_xfers(Context *ctx, std::vector<GraphXfer *> &xfers,
                   bool print_message,
-                  std::function<float(Graph *)> cost_function = nullptr);
+                  std::function<float(Graph *)> cost_function = nullptr, int timeout = 3600);
 
   std::shared_ptr<Graph>
   greedy_optimize(Context *ctx, const std::string &equiv_file_name,
                   bool print_message,
-                  std::function<float(Graph *)> cost_function = nullptr);
+                  std::function<float(Graph *)> cost_function = nullptr, int timeout = 3600);
   std::shared_ptr<Graph>
   optimize_legacy(float alpha, int budget, bool print_subst, Context *ctx,
                   const std::string &equiv_file_name,

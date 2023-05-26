@@ -1593,10 +1593,21 @@ void Graph::draw_circuit(const std::string &src_file_name,
              .c_str());
 }
 
+std::string log_str (std::chrono::time_point<std::chrono::steady_clock> t, float cost) {
+  auto current = std::chrono::steady_clock::now();
+  auto td = (double)std::chrono::duration_cast<std::chrono::milliseconds>(current - t).count()/1000.0;
+ return "(" + std::to_string(td) + ", " + std::to_string(cost)+");";
+}
+
+void write_file (std::string fn, std::string contents) {
+  std::ofstream file(fn, std::ofstream::out | std::ofstream::trunc);
+  file << contents;
+  file.close();
+}
 
 std::shared_ptr<Graph> Graph::greedy_optimize_with_xfers (
-  Context *ctx, const std::vector<GraphXfer *> &xfers,
-  bool print_message, std::function<float(Graph *)> cost_function) {
+  Context *ctx, std::vector<GraphXfer *> &xfers,
+  bool print_message, std::function<float(Graph *)> cost_function, int timeout) {
   if (cost_function == nullptr) {
     cost_function = [](Graph *graph) { return graph->total_cost(); };
   }
@@ -1645,46 +1656,69 @@ std::shared_ptr<Graph> Graph::greedy_optimize_with_xfers (
   size_t num_visits = 0;
   optimized_graph->topology_order_ops(all_nodes);
   auto start = std::chrono::steady_clock::now();
+  std::string log = log_str (start, original_cost);
   std::cout << "total xfers = " << xfers.size() << std::endl;
   std::cout << "total nodes = " << all_nodes.size() << std::endl;
+
   do {
     optimized_in_this_iteration = false;
-    for (auto xfer : xfers) {
-      bool optimized_this_xfer;
-      do {
-        optimized_this_xfer = false;
-        for (auto const &node : all_nodes) {
-          auto new_graph = optimized_graph->apply_xfer(
-              xfer, node, context->has_parameterized_gate());
-          num_visits++;
-          if (new_graph) {
-
-            optimized_graph.swap(new_graph);
-            // Update the wires after applying a transformation.
-            all_nodes.clear();
-            optimized_graph->topology_order_ops(all_nodes);
-            optimized_this_xfer = true;
-            optimized_in_this_iteration = true;
-            // Since |all_nodes| has changed, we cannot continue this loop.
-            break;
+    for (auto it = xfers.begin(); it != xfers.end(); ++it) {
+      // (auto xfer : xfers) {
+      auto xfer = *it;
+      // bool optimized_this_xfer;
+      // do {
+      // optimized_this_xfer = false;
+      for (auto const &node : all_nodes) {
+        auto new_graph = optimized_graph->apply_xfer(
+            xfer, node, context->has_parameterized_gate());
+        num_visits++;
+        if (new_graph) {
+          optimized_graph.swap(new_graph);
+          // Update the wires after applying a transformation.
+          all_nodes.clear();
+          optimized_graph->topology_order_ops(all_nodes);
+          // optimized_this_xfer = true;
+          optimized_in_this_iteration = true;
+          if (print_message) {
+            auto cc = cost_function(optimized_graph.get());
+            log += log_str(start, cc);
           }
+          // Since |all_nodes| has changed, we cannot continue this loop.
+          break;
         }
-      } while (optimized_this_xfer);
+      }
+      // } while (optimized_this_xfer);
+      auto end = std::chrono::steady_clock::now();
+      auto te = (int)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / 1000.0;
+      std::cout << "time elapsed = " << te  << " " << timeout << std::endl;
+      if (te > timeout) {
+        if (print_message) {
+          log += log_str (start, cost_function(optimized_graph.get()));
+          std::cout << log << std::endl;
+        }
+        std::cout << "timed out. "<<std::endl;
+        return optimized_graph;
+      }
+      if (optimized_in_this_iteration && it != xfers.begin()) {
+        std::rotate (xfers.begin(), it, it + 1);
+        std::cout << "rotation\n";
+        break;
+      }
     }
   } while (optimized_in_this_iteration);
   auto end = std::chrono::steady_clock::now();
 
-  std::cout << "total nodes visited = " << num_visits << std::endl;
-  std::cout << "time in for loop " <<(double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                   end - start)
-                       .count() /
-                   1000.0
-            << " seconds." <<std::endl;
+  // std::cout << "total nodes visited = " << num_visits << std::endl;
+  // std::cout << "time in for loop " <<(double)std::chrono::duration_cast<std::chrono::milliseconds>(
+  //                  end - start)
+  //                      .count() /
+  //                  1000.0
+  //           << " seconds." <<std::endl;
   auto optimized_cost = cost_function(optimized_graph.get());
 
   if (print_message) {
-    std::cout << "greedy_optimize(): cost optimized from " << original_cost
-              << " to " << optimized_cost << std::endl;
+    log += log_str(start, optimized_cost);
+    std::cout << log << std::endl;
   }
 
   return optimized_graph;
@@ -1692,7 +1726,7 @@ std::shared_ptr<Graph> Graph::greedy_optimize_with_xfers (
 
 
 std::shared_ptr<Graph> Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
-  bool print_message, std::function<float(Graph *)> cost_function) {
+  bool print_message, std::function<float(Graph *)> cost_function, int timeout) {
   EquivalenceSet eqs;
   // Load equivalent dags from file
   if (!eqs.load_json(ctx, equiv_file_name)) {
@@ -1729,7 +1763,7 @@ std::shared_ptr<Graph> Graph::greedy_optimize(Context *ctx, const std::string &e
       }
     }
   }
-  return greedy_optimize_with_xfers(ctx, xfers, print_message, cost_function);
+  return greedy_optimize_with_xfers(ctx, xfers, print_message, cost_function, timeout);
 }
 
 
@@ -2043,7 +2077,7 @@ Graph::optimize(Context *ctx, const std::string &equiv_file_name,
       equiv_file_name.substr(0, std::max(0, (int)equiv_file_name.size() - 21)) +
       circuit_name + ".log";
   auto preprocessed_graph =
-      greedy_optimize(ctx, equiv_file_name, print_message, cost_function);
+      greedy_optimize(ctx, equiv_file_name, false, cost_function);
   //   return preprocessed_graph->optimize(xfers, cost_upper_bound,
   //   circuit_name,
   //                                       log_file_name, print_message,
@@ -2060,7 +2094,9 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
   if (cost_function == nullptr) {
     cost_function = [](Graph *graph) { return graph->total_cost(); };
   }
-  auto start = std::chrono::steady_clock::now();
+  auto og_start = std::chrono::steady_clock::now();
+  auto start = og_start;
+
   std::priority_queue<std::shared_ptr<Graph>,
                       std::vector<std::shared_ptr<Graph>>, GraphCompare>
       candidates((GraphCompare(cost_function)));
@@ -2086,6 +2122,8 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
   constexpr int kMaxNumCandidates = 2000;
   constexpr int kShrinkToNumCandidates = 1000;
 
+
+  std::string log = log_str (start, best_cost);
   while (!candidates.empty()) {
     auto graph = candidates.top();
     candidates.pop();
@@ -2102,8 +2140,10 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
                     .count() /
                 1000.0 >
             timeout) {
-          std::cout << "Timeout. Program terminated. Best cost is " << best_cost
-                    << std::endl;
+          log += log_str (og_start, best_cost);
+          if (print_message) {
+            std::cout << log << std::endl;
+          }
           return best_graph;
         }
         if (new_graph == nullptr)
@@ -2119,6 +2159,10 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
           if (new_cost < best_cost) {
             best_cost = new_cost;
             best_graph = new_graph;
+            if (!print_message) {
+              start = std::chrono::steady_clock::now();
+            }
+            log += log_str (og_start, best_cost);
           }
         } else
           continue;
@@ -2160,16 +2204,18 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
       }
     }
     auto end = std::chrono::steady_clock::now();
-    if (print_message) {
-      fprintf(fout,
-              "[%s] Best cost: %f\tcandidate number: %d\tafter %.3f seconds.\n",
-              circuit_name.c_str(), best_cost, candidates.size(),
-              (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                  end - start)
-                      .count() /
-                  1000.0);
-      fflush(fout);
-    }
+  }
+  if (print_message) {
+    log += log_str (og_start, best_cost);
+    std::cout << log << std::endl;
+    // fprintf(fout,
+    //         "[%s] Best cost: %f\tcandidate number: %d\tafter %.3f seconds.\n",
+    //         circuit_name.c_str(), best_cost, candidates.size(),
+    //         (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+    //             end - start)
+    //                 .count() /
+    //             1000.0);
+    // fflush(fout);
   }
   return best_graph;
 }

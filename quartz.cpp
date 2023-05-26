@@ -220,6 +220,8 @@ extern "C" int opt_circuit_ (const char* cqasm_, int timeout, char* buffer, int 
     std::cout << "deleting wrongs" << std::endl;
     delete ctxt;
   }
+
+  *xfers_ptr = xfers;
   return write_qasm_to_buffer(cqasm2, buffer, buff_size);
   // std::cout << "circuit after opt = ";
   // std::cout << cqasm2.c_str() << std::endl;
