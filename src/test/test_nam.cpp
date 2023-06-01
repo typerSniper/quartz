@@ -93,7 +93,18 @@ int main(int argc, char **argv) {
   }
   else {
     std::cout << "general search" << std::endl;
-    graph_after_search = graph_before_search->optimize(&dst_ctx, eqset_fn, fn, true, nullptr, -1, timeout);
+    auto t0 = std::chrono::steady_clock::now();
+    auto greedy_graph = graph_before_search->greedy_optimize(&dst_ctx, eqset_fn, true, nullptr, timeout);
+    auto t1 = std::chrono::steady_clock::now();
+    auto rem = timeout - std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count()/1000.0;
+    std::cout << "running search with remaining time " << rem << std::endl;
+    if (rem > 0) {
+      graph_after_search = greedy_graph->optimize(&dst_ctx, eqset_fn, fn, true, nullptr, -1, rem);
+    }
+    else {
+      graph_after_search = greedy_graph;
+      std::cout << "(0.0, " << greedy_graph->gate_count()<<");\n";
+    }
   }
   end = std::chrono::steady_clock::now();
   std::cout << "Optimization results of Quartz for " << fn
