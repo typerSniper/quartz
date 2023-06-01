@@ -136,7 +136,6 @@ extern "C" void load_xfers_ (const char* eqset_fn_,
 extern "C" int preprocess_ (const char* cqasm_, char* buffer, int buff_size) {
 
   std::string cqasm(cqasm_);
-  // std::cout << "here with qasm "<< cqasm << std::endl;
 
   Context src_ctx({GateType::u1, GateType::h, GateType::ccz, GateType::rz, GateType::rx, GateType::x, GateType::cx,
                    GateType::input_qubit, GateType::input_param});
