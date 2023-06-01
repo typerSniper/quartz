@@ -1657,8 +1657,6 @@ std::shared_ptr<Graph> Graph::greedy_optimize_with_xfers (
   optimized_graph->topology_order_ops(all_nodes);
   auto start = std::chrono::steady_clock::now();
   std::string log = log_str (start, original_cost);
-  std::cout << "total xfers = " << xfers.size() << std::endl;
-  std::cout << "total nodes = " << all_nodes.size() << std::endl;
 
   do {
     optimized_in_this_iteration = false;
@@ -1690,7 +1688,6 @@ std::shared_ptr<Graph> Graph::greedy_optimize_with_xfers (
       // } while (optimized_this_xfer);
       auto end = std::chrono::steady_clock::now();
       auto te = (int)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / 1000.0;
-      std::cout << "time elapsed = " << te  << " " << timeout << std::endl;
       if (te > timeout) {
         if (print_message) {
           log += log_str (start, cost_function(optimized_graph.get()));
@@ -1701,7 +1698,6 @@ std::shared_ptr<Graph> Graph::greedy_optimize_with_xfers (
       }
       if (optimized_in_this_iteration && it != xfers.begin()) {
         std::rotate (xfers.begin(), it, it + 1);
-        std::cout << "rotation\n";
         break;
       }
     }
