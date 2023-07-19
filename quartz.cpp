@@ -5,9 +5,26 @@
 using namespace quartz;
 
 // Construct contexts
-Context gctxt({GateType::h, GateType::x, GateType::rz, GateType::add,
-                  GateType::cx, GateType::input_qubit, GateType::input_param});
-auto gcost_function = [](Graph *graph) { return graph->total_cost(); };
+auto nam_set = {GateType::h, GateType::x, GateType::rz, GateType::add,
+                  GateType::cx, GateType::input_qubit, GateType::input_param};
+auto clifft_set = {GateType::t, GateType::tdg, GateType::h, GateType::s,
+               GateType::sdg, GateType::cx,  GateType::input_qubit};
+auto gate_set = nam_set;
+// Context gctxt();
+
+
+// Context ctctxt({GateType::t, GateType::tdg, GateType::h, GateType::s, GateType::sdg, GateType::cx});
+
+// Context* new_ctxt (const Context c) {
+//   auto vec = c.get_supported_gates();
+//   return new Context (vec);
+// }
+
+auto total_count = [](Graph *graph) { return graph->total_cost(); };
+auto tcount = [](Graph *graph) {
+    return (float) (graph->specific_gate_count(GateType::t) + graph->specific_gate_count(GateType::tdg));};
+
+auto gcost_function = total_count;
 
 int write_qasm_to_buffer (std::string cqasm, char* buffer, int buff_size) {
   int blen = static_cast<int>(strlen(cqasm.c_str()));
@@ -22,6 +39,7 @@ int write_qasm_to_buffer (std::string cqasm, char* buffer, int buff_size) {
 extern "C" long unsigned int load_eqset_ (const char* eqset_fn_, unsigned char** store) {
   std::string eqset_fn(eqset_fn_);
   EquivalenceSet* eqs = new EquivalenceSet();
+  auto gctxt = Context(gate_set);
   if (!eqs->load_json(&gctxt, eqset_fn)) {
     std::cout << "Failed to load equivalence file \"" << eqset_fn
               << "\"." << std::endl;
@@ -68,8 +86,7 @@ extern "C" long unsigned int load_greedy_xfers_ (const char* eqset_fn_, unsigned
   std::istringstream iss(eqset_fn);
 
   EquivalenceSet* eqs = new EquivalenceSet();
-  Context *ctxt = new Context({GateType::h, GateType::x, GateType::rz, GateType::add,
-                  GateType::cx, GateType::input_qubit, GateType::input_param});
+  Context *ctxt = new Context(gate_set);
   if (!eqs->load_json(ctxt, iss)) {
     std::cout << "Failed to load equivalence file \"" << "whe"
               << "\"." << std::endl;
@@ -94,8 +111,7 @@ extern "C" void load_xfers_ (const char* eqset_fn_,
   std::istringstream iss(eqset_fn);
 
   EquivalenceSet* eqs = new EquivalenceSet();
-  Context *ctxt = new Context({GateType::h, GateType::x, GateType::rz, GateType::add,
-                  GateType::cx, GateType::input_qubit, GateType::input_param});
+  Context *ctxt = new Context(gate_set);
   if (!eqs->load_json(ctxt, iss)) {
     std::cout << "Failed to load equivalence file \"" << "whe"
               << "\"." << std::endl;
@@ -156,8 +172,7 @@ extern "C" int preprocess_ (const char* cqasm_, char* buffer, int buff_size) {
   auto new_graph = graph->toffoli_flip_greedy(GateType::rz, xfer_pair.first, xfer_pair.second);
   // std::cout << "flipping done\n"<<  std::endl;
 
-  Context dst_ctx({GateType::h, GateType::x, GateType::rz, GateType::add,
-                  GateType::cx, GateType::input_qubit, GateType::input_param});
+  Context dst_ctx(gate_set);
   auto uctx = union_contexts(&rem_ctx, &dst_ctx);
   // auto y_rule = "y = rz(0.5pi) q0; rz(0.5pi) q0; h q0; rz(0.5pi) q0; rz(0.5pi) q0; h q0;";
   RuleParser rules({"rx q0 p0 = h q0; rz q0 p0; h q0;", "u1 q0 p0 = rz q0 p0;"}); // TODO: check this.
@@ -180,8 +195,8 @@ extern "C" int opt_circuit_ (const char* cqasm_, int timeout, char* buffer, int 
   // std::string eqset_fn = "Nam_4_3_complete_ECC_set.json";
   Context* ctxt;
   if (xfers.size () == 0) {
-    ctxt = new Context({GateType::h, GateType::x, GateType::rz, GateType::add,
-                   GateType::cx, GateType::input_qubit, GateType::input_param});
+    // ctxt = new_ctxt(gctxt) ;
+    ctxt = new Context (gate_set);
   } else {
     ctxt = xfers[0]->context;
   }
@@ -196,21 +211,21 @@ extern "C" int opt_circuit_ (const char* cqasm_, int timeout, char* buffer, int 
   if (timeout == 0) {
     graph_after_search = graph->greedy_optimize_with_xfers(ctxt, xfers, /*print_message=*/ false, gcost_function);
   } else {
-    graph_after_search = graph->optimize(xfers, 1.05 * graph->total_cost(), "", "", false, nullptr, timeout);
+    graph_after_search = graph->optimize(xfers, 1.05 * gcost_function(graph.get()), "", "", false, nullptr, timeout);
   }
 
   auto end = std::chrono::steady_clock::now();
 
-  std::cout << " Gate count optimized from: "
-            << graph->gate_count() << " to "
-            << graph_after_search->gate_count() << ", "
+  std::cout << " Cost function optimized from: "
+            << gcost_function (graph.get()) << " to "
+            << gcost_function(graph_after_search.get()) << ", "
             << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                    end - start)
                        .count() /
                    1000.0
             << " seconds." << std::endl;
 
-  if (graph->total_cost() <= graph_after_search->total_cost()) {
+  if (gcost_function(graph.get()) <= gcost_function(graph_after_search.get())) {
     return -1;
   }
   std::string cqasm2 = graph_after_search->to_qasm(false, false);
