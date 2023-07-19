@@ -1759,6 +1759,7 @@ std::shared_ptr<Graph> Graph::greedy_optimize(Context *ctx, const std::string &e
       }
     }
   }
+  std::cout << "greedy xfers = " << xfers.size() << std::endl;
   return greedy_optimize_with_xfers(ctx, xfers, print_message, cost_function, timeout);
 }
 
@@ -2067,18 +2068,18 @@ Graph::optimize(Context *ctx, const std::string &equiv_file_name,
     std::cout << "Number of xfers: " << xfers.size() << std::endl;
   }
   if (cost_upper_bound == -1) {
-    cost_upper_bound = total_cost() * 1.05;
+    cost_upper_bound = cost_function(this) * 1.05;
   }
   auto log_file_name =
       equiv_file_name.substr(0, std::max(0, (int)equiv_file_name.size() - 21)) +
       circuit_name + ".log";
-  auto preprocessed_graph =
-      greedy_optimize(ctx, equiv_file_name, false, cost_function);
+  // auto preprocessed_graph =
+      // greedy_optimize(ctx, equiv_file_name, false, cost_function);
   //   return preprocessed_graph->optimize(xfers, cost_upper_bound,
   //   circuit_name,
   //                                       log_file_name, print_message,
   //                                       cost_function, timeout);
-  return preprocessed_graph->optimize(xfers, cost_upper_bound, circuit_name, "",
+  return optimize(xfers, cost_upper_bound, circuit_name, "",
                                       print_message, cost_function, timeout);
 }
 
@@ -2118,6 +2119,41 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
   constexpr int kMaxNumCandidates = 2000;
   constexpr int kShrinkToNumCandidates = 1000;
 
+  auto shrink_candidates = [&]() {
+    if (print_message) {
+      fprintf(fout, "%s: shrink the priority queue with %d candidates.\n",
+              circuit_name.c_str(), (int)candidates.size());
+    }
+    auto shrink_start = std::chrono::steady_clock::now();
+    std::priority_queue<std::shared_ptr<Graph>,
+                        std::vector<std::shared_ptr<Graph>>, GraphCompare>
+        new_candidates((GraphCompare(cost_function)));
+    std::map<float, int> cost_count;
+    while (!candidates.empty()) {
+      auto candidate = candidates.top();
+      cost_count[cost_function(candidate.get())]++;
+      if (new_candidates.size() < kShrinkToNumCandidates) {
+        new_candidates.push(candidate);
+      }
+      candidates.pop();
+    }
+    std::swap(candidates, new_candidates);
+    auto shrink_end = std::chrono::steady_clock::now();
+    if (print_message) {
+      fprintf(
+          fout,
+          "%s: shrank the priority queue to %d candidates in %.3f seconds.\n",
+          circuit_name.c_str(), (int)candidates.size(),
+          (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+              shrink_end - shrink_start)
+                  .count() /
+              1000.0);
+      for (auto &it : cost_count) {
+        fprintf(fout, "%d circuits have cost %.2f\n", it.second, it.first);
+      }
+      fflush(fout);
+    }
+  };
 
   std::string log = log_str (start, best_cost);
   while (!candidates.empty()) {
@@ -2152,6 +2188,9 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
         if (hashmap.find(new_hash) == hashmap.end()) {
           hashmap.insert(new_hash);
           candidates.push(new_graph);
+          if (candidates.size() > kMaxNumCandidates) {
+            shrink_candidates ();
+          }
           if (new_cost < best_cost) {
             best_cost = new_cost;
             best_graph = new_graph;
@@ -2164,41 +2203,7 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
           continue;
       }
     }
-    if (candidates.size() > kMaxNumCandidates) {
-      if (print_message) {
-        fprintf(fout, "%s: shrink the priority queue with %d candidates.\n",
-                circuit_name.c_str(), (int)candidates.size());
-      }
-      auto shrink_start = std::chrono::steady_clock::now();
-      std::priority_queue<std::shared_ptr<Graph>,
-                          std::vector<std::shared_ptr<Graph>>, GraphCompare>
-          new_candidates((GraphCompare(cost_function)));
-      std::map<float, int> cost_count;
-      while (!candidates.empty()) {
-        auto candidate = candidates.top();
-        cost_count[cost_function(candidate.get())]++;
-        if (new_candidates.size() < kShrinkToNumCandidates) {
-          new_candidates.push(candidate);
-        }
-        candidates.pop();
-      }
-      std::swap(candidates, new_candidates);
-      auto shrink_end = std::chrono::steady_clock::now();
-      if (print_message) {
-        fprintf(
-            fout,
-            "%s: shrank the priority queue to %d candidates in %.3f seconds.\n",
-            circuit_name.c_str(), (int)candidates.size(),
-            (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                shrink_end - shrink_start)
-                    .count() /
-                1000.0);
-        for (auto &it : cost_count) {
-          fprintf(fout, "%d circuits have cost %.2f\n", it.second, it.first);
-        }
-        fflush(fout);
-      }
-    }
+
     auto end = std::chrono::steady_clock::now();
   }
   if (print_message) {
