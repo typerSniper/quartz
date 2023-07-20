@@ -62,11 +62,15 @@ int main(int argc, char **argv) {
   }
   Graph graph(&src_ctx, dag);
 
+
+
   auto start = std::chrono::steady_clock::now();
   // Greedy toffoli flip
   auto graph_before_search = graph.toffoli_flip_greedy(
       GateType::rz, xfer_pair.first, xfer_pair.second);
+
   graph_before_search->to_qasm(fn + ".toffoli_flip", false, false);
+  graph_before_search->constant_and_rotation_elimination();
   auto end = std::chrono::steady_clock::now();
   // if (disable_search) {
   //   std::cout << "Optimization results of Quartz for " << fn
