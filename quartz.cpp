@@ -216,10 +216,16 @@ extern "C" int opt_circuit_ (const char* cqasm_, int timeout, char* buffer, int 
   // Assume that the context is same?
   // std::cout << "calling greedy_opt" << std::endl;
   // auto graph_after_search = graph.greedy_optimize(ctxt, eqset_fn, /*print_message=*/ false);
+  std::cout << "timeout received = " << timeout << std::endl;
   std::shared_ptr<Graph> graph_after_search;
   if (timeout == 0) {
     graph_after_search = graph->greedy_optimize_with_xfers(ctxt, xfers, /*print_message=*/ false, gcost_function);
-  } else {
+  }
+  else if (timeout < 0) {
+    graph_after_search = graph->greedy_optimize_with_xfers(ctxt, xfers, /*print_message=*/ false, gcost_function, -1 * timeout);
+    std::cout << "done" << std::endl;
+  }
+  else {
     graph_after_search = graph->optimize(xfers, 1.05 * gcost_function(graph.get()), "", "", false, nullptr, timeout);
   }
 
