@@ -284,13 +284,8 @@ bool QASMParser::load_qasm_stream(
         seq->add_gate(qubit_indices, param_indices, gate, ctx_);
       }
     } else {
-<<<<<<< HEAD
-      std::cout << "Unknown gate: " << command << std::endl;
-      return false;
-=======
       std::cerr << "Unknown gate: " << command << std::endl;
       assert(false);
->>>>>>> 89235780e3a1d9c9f420c4f967a393ad41e6c3d1
     }
   }
   return true;
