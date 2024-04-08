@@ -41,7 +41,6 @@ int string_to_number(const std::string &input) {
 }
 
 bool is_gate_string(const std::string &token, GateType &type) {
-
 #define PER_GATE(x, XGate)                                                     \
   if (token == std::string(#x)) {                                              \
     type = GateType::x;                                                        \
@@ -67,4 +66,4 @@ std::string strip(const std::string &input) {
   return std::string(st, ed.base());
 }
 
-} // namespace quartz
+}  // namespace quartz

@@ -25,8 +25,8 @@ bool is_gate_string(const std::string &token, GateType &type);
 std::string strip(const std::string &input);
 
 class QASMParser {
-public:
-  QASMParser(Context *ctx) : context(ctx) {}
+ public:
+  QASMParser(Context *ctx) : ctx_(ctx) {}
 
   template <class _CharT, class _Traits>
   bool load_qasm_stream(std::basic_istream<_CharT, _Traits> &qasm_stream,
@@ -49,8 +49,8 @@ public:
     return res;
   }
 
-private:
-  Context *context;
+ private:
+  Context *ctx_;
 };
 
 // We cannot put this template function implementation in a .cpp file.
@@ -66,9 +66,30 @@ bool QASMParser::load_qasm_stream(
   // ordered alphabetically.
   std::map<std::string, int> index_offset;
   std::unordered_map<ParamType, int> parameters;
-  int num_total_params = context->input_parameters.size();
+  bool in_general_controlled_gate_block = false;
+  std::vector<bool> general_control_flipped_qubits;
+  int num_flipped_qubits;
 
   while (std::getline(qasm_stream, line, ';')) {
+    if (line.find("//ctrl") != std::string::npos) {
+      // Quartz's specific comment to enter a general control gate block
+      assert(!in_general_controlled_gate_block);
+      in_general_controlled_gate_block = true;
+      general_control_flipped_qubits.clear();
+      num_flipped_qubits = 0;
+    }
+    // Remove comments
+    auto comment_position = line.find("//");
+    while (comment_position != std::string::npos) {
+      auto newline_position = line.find('\n', comment_position + 2 /*"//"*/);
+      if (newline_position == std::string::npos) {
+        // remove until the end
+        line.resize(comment_position);
+        break;
+      }
+      line.replace(comment_position, newline_position - comment_position, "");
+      comment_position = line.find("//", comment_position);
+    }
     // Replace comma with space
     find_and_replace_all(line, ",", " ");
     // Replace parentheses for parameterized gate with space
@@ -76,30 +97,30 @@ bool QASMParser::load_qasm_stream(
     find_and_replace_last(line, ")", " ");
     // Ignore end of line
     find_and_replace_all(line, "\n", "");
-    while (line.front() == ' ') {
+    while (!line.empty() && line.front() == ' ') {
       line.erase(0, 1);
     }
     std::stringstream ss(line);
     std::string command;
     std::getline(ss, command, ' ');
+    // Strip the command to avoid potential '\r'
+    command = strip(command);
     // XXX: "u" is an alias of "u3".
     if (command == std::string("u")) {
       command = std::string("u3");
     }
-    if (command == "//") {
-      continue; // comment, ignore this line
-    } else if (command == "") {
-      continue; // empty line, ignore this line
+    if (command.empty()) {
+      continue;  // empty line, ignore this line
     } else if (command == "OPENQASM" || command == "OpenQASM") {
-      continue; // header, ignore this line
+      continue;  // header, ignore this line
     } else if (command == "include") {
-      continue; // header, ignore this line
+      continue;  // header, ignore this line
     } else if (command == "barrier") {
-      continue; // file end, ignore this line
+      continue;  // file end, ignore this line
     } else if (command == "measure") {
-      continue; // file end, ignore this line
+      continue;  // file end, ignore this line
     } else if (command == "creg") {
-      continue; // ignore this line
+      continue;  // ignore this line
     } else if (command == "qreg") {
       std::string name;
       getline(ss, name, '[');
@@ -127,17 +148,16 @@ bool QASMParser::load_qasm_stream(
           qreg.second = num_qubits;
           num_qubits = new_num_qubits;
         }
-        seq = new CircuitSeq(num_qubits,
-                             /*num_input_parameters=*/num_total_params);
+        seq = new CircuitSeq(num_qubits);
       }
-      Gate *gate = context->get_gate(gate_type);
+      Gate *gate = ctx_->get_gate(gate_type);
       if (!gate) {
         std::cerr << "Unsupported gate in current context: " << command
                   << std::endl;
         return false;
       }
-      int num_qubits = context->get_gate(gate_type)->num_qubits;
-      int num_params = context->get_gate(gate_type)->num_parameters;
+      int num_qubits = ctx_->get_gate(gate_type)->num_qubits;
+      int num_params = ctx_->get_gate(gate_type)->num_parameters;
       std::vector<int> qubit_indices(num_qubits);
       std::vector<int> param_indices(num_params);
       for (int i = 0; i < num_params; ++i) {
@@ -175,21 +195,21 @@ bool QASMParser::load_qasm_stream(
             }
           }
         } else if (token.find("pi") != std::string::npos) {
-          if (token.find("(") != std::string::npos) {
-            assert(token.find("/") != std::string::npos);
-            auto left_parenthesis_pos = token.find("(");
+          if (token.find('(') != std::string::npos) {
+            assert(token.find('/') != std::string::npos);
+            auto left_parenthesis_pos = token.find('(');
             // 0.123/(2*pi)
-            p = std::stod(token.substr(0, token.find("/"))) / PI;
+            p = std::stod(token.substr(0, token.find('/'))) / PI;
             p /= std::stod(
                 token.substr(left_parenthesis_pos + 1,
-                             token.find("*") - left_parenthesis_pos - 1));
+                             token.find('*') - left_parenthesis_pos - 1));
           } else {
             // 0.123*pi
-            auto d = token.substr(0, token.find("*"));
+            auto d = token.substr(0, token.find('*'));
             p = std::stod(d) * PI;
-            if (token.find("/") != std::string::npos) {
+            if (token.find('/') != std::string::npos) {
               // 0.123*pi/2
-              p = p / std::stod(token.substr(token.find("/") + 1));
+              p = p / std::stod(token.substr(token.find('/') + 1));
             }
           }
         } else {
@@ -199,9 +219,8 @@ bool QASMParser::load_qasm_stream(
         if (negative)
           p = -p;
         if (parameters.count(p) == 0) {
-          seq->add_input_parameter();
-          parameters[p] = num_total_params++;
-          context->input_parameters.push_back(p);
+          int param_id = ctx_->get_new_param_id(p);
+          parameters[p] = param_id;
         }
         param_indices[i] = parameters[p];
       }
@@ -223,13 +242,58 @@ bool QASMParser::load_qasm_stream(
         }
         qubit_indices[i] = index_offset[name] + index;
       }
-      seq->add_gate(qubit_indices, param_indices, gate, nullptr);
+      if (in_general_controlled_gate_block) {
+        if (gate_type == GateType::x) {
+          // Flip a qubit.
+          if (qubit_indices[0] >= (int)general_control_flipped_qubits.size()) {
+            general_control_flipped_qubits.resize(qubit_indices[0] + 1);
+          }
+          if (general_control_flipped_qubits[qubit_indices[0]]) {
+            // Already flipped, now flip it back.
+            general_control_flipped_qubits[qubit_indices[0]] = false;
+            num_flipped_qubits--;
+            if (!num_flipped_qubits) {
+              // Exit this general controlled gate block.
+              in_general_controlled_gate_block = false;
+            }
+          } else {
+            num_flipped_qubits++;
+            general_control_flipped_qubits[qubit_indices[0]] = true;
+          }
+        } else if (gate->get_num_control_qubits() > 0) {
+          // The general controlled gate.
+          int num_control = gate->get_num_control_qubits();
+          assert(num_control <= (int)qubit_indices.size());
+          std::vector<bool> state(num_control, true);
+          for (int i = 0; i < num_control; i++) {
+            if (qubit_indices[i] < (int)general_control_flipped_qubits.size()) {
+              // If flipped, set to 0 (default is 1).
+              state[i] = !general_control_flipped_qubits[qubit_indices[i]];
+            }
+          }
+          auto general_controlled_gate =
+              ctx_->get_general_controlled_gate(gate_type, state);
+          seq->add_gate(qubit_indices, param_indices, general_controlled_gate,
+                        ctx_);
+        } else {
+          std::cerr << "Unexpected gate " << command
+                    << " in general controlled gate block." << std::endl;
+          assert(false);
+        }
+      } else {
+        seq->add_gate(qubit_indices, param_indices, gate, ctx_);
+      }
     } else {
+<<<<<<< HEAD
       std::cout << "Unknown gate: " << command << std::endl;
       return false;
+=======
+      std::cerr << "Unknown gate: " << command << std::endl;
+      assert(false);
+>>>>>>> 89235780e3a1d9c9f420c4f967a393ad41e6c3d1
     }
   }
   return true;
 }
 
-} // namespace quartz
+}  // namespace quartz

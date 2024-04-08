@@ -2,11 +2,12 @@
 
 #include "../math/matrix.h"
 #include "gate.h"
+
 #include <assert.h>
 
 namespace quartz {
 class CZGate : public Gate {
-public:
+ public:
   CZGate()
       : Gate(GateType::cz, 2 /*num_qubits*/, 0 /*num_parameters*/),
         mat({{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, -1}}) {}
@@ -18,4 +19,4 @@ public:
   Matrix<4> mat;
 };
 
-} // namespace quartz
+}  // namespace quartz

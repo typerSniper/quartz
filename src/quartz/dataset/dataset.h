@@ -8,7 +8,13 @@
 namespace quartz {
 
 class Dataset {
-public:
+ public:
+  /**
+   * Dump a Json file for verifier.py.
+   * @param ctx The context.
+   * @param file_name The file name to write to.
+   * @return True iff the file is saved successfully.
+   */
   bool save_json(Context *ctx, const std::string &file_name) const;
 
   // Return the number of DAGs removed.
@@ -41,4 +47,4 @@ public:
                      std::vector<std::unique_ptr<CircuitSeq>>>
       dataset;
 };
-} // namespace quartz
+}  // namespace quartz

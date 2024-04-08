@@ -62,9 +62,15 @@ cdef extern from "gate/gate.h" namespace "quartz":
         GateType tp
         int num_qubits, num_parameters
 
+cdef extern from "context/param_info.h" namespace "quartz":
+    cdef cppclass ParamInfo:
+        ParamInfo() except +
+
+ctypedef ParamInfo* ParamInfo_ptr
+
 cdef extern from "context/context.h" namespace "quartz":
     cdef cppclass Context:
-        Context(const vector[GateType]) except +
+        Context(const vector[GateType], ParamInfo_ptr) except +
         size_t next_global_unique_id()
         bool has_parameterized_gate() const
 
@@ -72,11 +78,8 @@ ctypedef Context* Context_ptr
 
 cdef extern from "circuitseq/circuitseq.h" namespace "quartz":
     cdef cppclass CircuitSeq:
-        CircuitSeq(int, int) except +
+        CircuitSeq(int) except +
         int get_num_qubits() const
-        int get_num_input_parameters() const
-        int get_num_total_parameters() const
-        int get_num_internal_parameters() const
         int get_num_gates() const
 
 ctypedef CircuitSeq* CircuitSeq_ptr
@@ -139,7 +142,7 @@ cdef extern from "dataset/equivalence_set.h" namespace "quartz":
     cdef cppclass EquivalenceSet:
         EquivalenceSet() except +
         int num_equivalence_classes() const
-        bool load_json(Context *, const string)
+        bool load_json(Context *, const string, bool)
         vector[vector[CircuitSeq_ptr]] get_all_equivalence_sets() except +
 
 

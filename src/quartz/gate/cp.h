@@ -2,11 +2,12 @@
 
 #include "../math/matrix.h"
 #include "gate.h"
+
 #include <assert.h>
 
 namespace quartz {
 class CPGate : public Gate {
-public:
+ public:
   CPGate() : Gate(GateType::cp, 2 /*num_qubits*/, 1 /*num_parameters*/) {}
   MatrixBase *get_matrix(const std::vector<ParamType> &params) override {
     assert(params.size() == 1);
@@ -28,4 +29,4 @@ public:
   std::unordered_map<float, std::unique_ptr<Matrix<4>>> cached_matrices;
 };
 
-} // namespace quartz
+}  // namespace quartz

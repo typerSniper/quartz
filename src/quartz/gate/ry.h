@@ -1,11 +1,12 @@
 #pragma once
 
 #include "gate.h"
+
 #include <assert.h>
 
 namespace quartz {
 class RYGate : public Gate {
-public:
+ public:
   RYGate() : Gate(GateType::ry, 1 /*num_qubits*/, 1 /*num_parameters*/) {}
   MatrixBase *get_matrix(const std::vector<ParamType> &params) override {
     assert(params.size() == 1);
@@ -21,4 +22,4 @@ public:
   std::unordered_map<float, std::unique_ptr<Matrix<2>>> cached_matrices;
 };
 
-} // namespace quartz
+}  // namespace quartz

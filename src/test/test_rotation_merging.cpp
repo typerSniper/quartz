@@ -12,10 +12,13 @@ int main() {
       "circuit/voqc-benchmarks/barenco_tof_10.qasm";
   std::string result_qasm_filename =
       "circuit/voqc-benchmarks/barenco_tof_10_rotation_merging.qasm";
+  ParamInfo param_info;
   Context src_ctx({GateType::input_param, GateType::input_qubit, GateType::ccz,
-                   GateType::h});
+                   GateType::h},
+                  &param_info);
   Context dst_ctx({GateType::input_param, GateType::input_qubit, GateType::h,
-                   GateType::rz, GateType::cx});
+                   GateType::rz, GateType::cx},
+                  &param_info);
   //   Context union_ctx({GateType::input_param, GateType::input_qubit,
   //   GateType::t,
   //                      GateType::tdg, GateType::cx, GateType::rz});
@@ -28,7 +31,7 @@ int main() {
 
   Graph graph(&union_ctx, dag);
   RuleParser rule_parser(
-      {"t q0 = rz q0 0.25pi", // t -> rz
+      {"t q0 = rz q0 0.25pi",  // t -> rz
        "tdg q0 = rz q0 -0.25pi",
        "ccz q0 q1 q2 = cx q1 q2; rz q2 -0.25pi; cx q0 q2; rz "
        "q2 0.25pi; cx q1 q2; rz q2 -0.25pi; cx "

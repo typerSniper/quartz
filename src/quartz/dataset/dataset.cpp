@@ -24,22 +24,10 @@ bool Dataset::save_json(Context *ctx, const std::string &file_name) const {
 
   fout << "[" << std::endl;
 
-  // The generated parameters for random testing.
-  auto all_parameters = ctx->get_all_generated_parameters();
-  fout << "[";
-  bool start0 = true;
-  for (auto &param : all_parameters) {
-    if (start0) {
-      start0 = false;
-    } else {
-      fout << ", ";
-    }
-    fout << std::scientific << std::setprecision(17) << param;
-  }
-  fout << "]," << std::endl;
+  fout << ctx->param_info_to_json() << "," << std::endl;
 
   fout << "{" << std::endl;
-  start0 = true;
+  bool start0 = true;
   for (const auto &it : dataset) {
     if (it.second.empty()) {
       // Empty CircuitSeq set
@@ -84,7 +72,7 @@ int Dataset::remove_singletons(Context *ctx) {
         found_possible_equivalence = true;
         break;
       }
-      assert(hash_value == it_hash_value + 1); // Only deal with this case...
+      assert(hash_value == it_hash_value + 1);  // Only deal with this case...
     }
     // ...so that we know for sure that only DAGs with hash value equal
     // to |it_hash_value - 1| can have other_hash_values() containing
@@ -128,12 +116,12 @@ int Dataset::normalize_to_canonical_representations(Context *ctx) {
     std::unique_ptr<CircuitSeq> new_dag;
 
     for (auto &dag : dags) {
-      bool is_canonical = dag->canonical_representation(&new_dag);
+      bool is_canonical = dag->canonical_representation(&new_dag, ctx);
       if (!is_canonical) {
         if (!dag_already_exists(*new_dag, new_dags)) {
           new_dags.push_back(std::move(new_dag));
         }
-        dag = nullptr; // delete the original CircuitSeq
+        dag = nullptr;  // delete the original CircuitSeq
       }
     }
     if (!new_dags.empty()) {
@@ -166,7 +154,7 @@ int Dataset::normalize_to_canonical_representations(Context *ctx) {
   for (auto &dag : dags_to_insert_afterwards) {
     const auto hash_value = dag->hash(ctx);
     if (!dag_already_exists(*dag, dataset[hash_value])) {
-      num_removed--; // Insert |circuitseq| back.
+      num_removed--;  // Insert |circuitseq| back.
       dataset[hash_value].push_back(std::move(dag));
     }
   }
@@ -203,4 +191,4 @@ void Dataset::clear() {
                                std::vector<std::unique_ptr<CircuitSeq>>>();
 }
 
-} // namespace quartz
+}  // namespace quartz

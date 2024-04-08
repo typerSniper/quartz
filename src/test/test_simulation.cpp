@@ -125,63 +125,80 @@ int main() {
   auto start = std::chrono::steady_clock::now();
   init_python_interpreter();
   PythonInterpreter interpreter;
+  ParamInfo param_info;
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
                GateType::x, GateType::ry, GateType::u2, GateType::u3,
-               GateType::cx, GateType::cz, GateType::cp, GateType::swap});
+               GateType::cx, GateType::cz, GateType::cp, GateType::swap,
+               GateType::rz, GateType::ccz},
+              &param_info);
   std::vector<std::string> circuit_names = {
-      "qft"
+      "nam-benchmarks/adder_8.qasm"
+      // "nam-benchmarks/csla_mux_3.qasm"
       // "realamprandom"
+      // "QASMBench/ising_n34.qasm"
   };
-  // 31 total qubits, 28 local qubits
-  std::vector<int> num_qubits = {31};
+  // 24 total qubits, 20 local qubits
+  std::vector<int> num_qubits = {24};
   std::vector<int> num_local_qubits;
-  for (int i = 28; i <= 28; i++) {
+  for (int i = 20; i <= 20; i++) {
     num_local_qubits.push_back(i);
   }
-  KernelCost kernel_cost(
-      /*fusion_kernel_costs=*/{0, 10.4, 10.400001, 10.400002, 11, 40, 46, 66},
-      /*shared_memory_init_cost=*/10,
-      /*shared_memory_gate_cost=*/[](GateType) { return 0.8; },
+  quartz::KernelCost kernel_cost(
+      /*fusion_kernel_costs=*/
+      {0, 6.4, 6.2, 6.5, 6.4, 6.4, 25.8, 32.4},
+      /*shared_memory_init_cost=*/6,
+      /*shared_memory_gate_cost=*/
+      [](quartz::GateType type) {
+        if (type == quartz::GateType::swap)
+          return 1000.0;  // we do not support swap gates in shared-memory
+                          // kernels
+        else
+          return 0.5;
+      },
       /*shared_memory_total_qubits=*/10, /*shared_memory_cacheline_qubits=*/3);
   // FILE *fout = fopen("result.txt", "w");
   for (auto circuit : circuit_names) {
     // fprintf(fout, "\n", circuit.c_str());
     for (int num_q : num_qubits) {
-      auto seq = CircuitSeq::from_qasm_file(
-          &ctx, std::string("circuit/MQTBench_") + std::to_string(num_q) +
-                    "q/" + circuit + "_indep_qiskit_" + std::to_string(num_q) +
-                    ".qasm");
+      /* auto seq = CircuitSeq::from_qasm_file(
+           &ctx, std::string("../circuit/MQTBench_") + std::to_string(num_q) +
+                     "q/" + circuit + "_indep_qiskit_" + std::to_string(num_q) +
+                     ".qasm");*/
+      auto seq = CircuitSeq::from_qasm_file(&ctx, std::string("../circuit/") +
+                                                      circuit);
 
-      /*
-      // Repeat the whole circuit for 1 time.
+      // Repeat the entire circuit for kNumRepeat times.
+      constexpr int kNumRepeat = 0;
       int num_gates = seq->get_num_gates();
-      for (int i = 0; i < num_gates; i++) {
-        std::vector<int> qubit_indices, param_indices;
-        for (auto &wire : seq->gates[i]->input_wires) {
-          if (wire->is_qubit()) {
-            qubit_indices.push_back(wire->index);
-          } else {
-            param_indices.push_back(wire->index);
+      for (int _ = 0; _ < kNumRepeat; _++) {
+        for (int i = 0; i < num_gates; i++) {
+          std::vector<int> qubit_indices, param_indices;
+          for (auto &wire : seq->gates[i]->input_wires) {
+            if (wire->is_qubit()) {
+              qubit_indices.push_back(wire->index);
+            } else {
+              param_indices.push_back(wire->index);
+            }
           }
+          seq->add_gate(qubit_indices, param_indices, seq->gates[i]->gate,
+                        nullptr);
         }
-        seq->add_gate(qubit_indices, param_indices, seq->gates[i]->gate,
-      nullptr);
       }
-      */
 
       // fprintf(fout, "%d", num_q);
       for (int local_q : num_local_qubits) {
-        std::vector<std::vector<int>> local_qubits;
-        // int result =
-        // num_iterations_by_heuristics(seq.get(), local_q, local_qubits);
-        // fprintf(fout, " %d", result);
-        local_qubits =
-            compute_local_qubits_with_ilp(*seq, local_q, &ctx, &interpreter);
-        auto schedules = get_schedules(*seq, local_qubits, kernel_cost, &ctx,
-                                       /*absorb_single_qubit_gates=*/true);
+        auto schedules =
+            get_schedules_with_ilp(*seq, local_q, std::min(2, num_q - local_q),
+                                   kernel_cost, &ctx, &interpreter,
+                                   /*attach_single_qubit_gates=*/true,
+                                   /*max_num_dp_states=*/500, "tmp");
         for (auto &schedule : schedules) {
-          std::cout << "cost = " << schedule.cost_ << std::endl;
-          schedule.print_kernel_schedule();
+          schedule.print_kernel_info();
+          // schedule.print_kernel_schedule();
+        }
+        bool ok = verify_schedule(&ctx, *seq, schedules);  // may take 1h
+        if (ok) {
+          std::cout << "Schedule verified." << std::endl;
         }
       }
       // fprintf(fout, "\n");

@@ -5,6 +5,7 @@
 #include "quartz/parser/qasm_parser.h"
 #include "quartz/tasograph/substitution.h"
 #include "quartz/tasograph/tasograph.h"
+
 #include <chrono>
 #include <iostream>
 #include <string>
@@ -21,10 +22,13 @@ template <class T> std::string output_vec(const std::vector<T> &vec) {
 }
 
 int main() {
+  ParamInfo param_info;
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
-               GateType::cx, GateType::t, GateType::tdg});
+               GateType::cx, GateType::t, GateType::tdg},
+              &param_info);
   EquivalenceSet eqs;
-  if (!eqs.load_json(&ctx, "../bfs_verified_simplified.json")) {
+  if (!eqs.load_json(&ctx, "../bfs_verified_simplified.json",
+                     /*from_verifier=*/false)) {
     std::cerr << "Failed to load equivalence file." << std::endl;
     return 1;
   }
@@ -70,7 +74,6 @@ int main() {
   const int idx = 7;
 
   for (int _t = 0; _t < 1e5; _t++) {
-
     const auto t1_start = std::chrono::high_resolution_clock::now();
     const auto ans_ref = graph.appliable_xfers(all_ops[idx], xfers);
     const auto t1_end = std::chrono::high_resolution_clock::now();

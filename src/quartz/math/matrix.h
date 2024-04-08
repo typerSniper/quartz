@@ -1,13 +1,14 @@
 #pragma once
 
 #include "../utils/utils.h"
+
 #include <cstring>
 #include <iostream>
 #include <vector>
 
 namespace quartz {
 class MatrixBase {
-public:
+ public:
   virtual void clear() {}
   virtual ComplexType *operator[](int x) { return nullptr; }
   virtual const ComplexType *operator[](int x) const { return nullptr; }
@@ -25,7 +26,7 @@ public:
 };
 
 template <int kSize> class Matrix : public MatrixBase {
-public:
+ public:
   void clear() { memset(data_, 0, sizeof(data_)); }
   Matrix() = default;
   Matrix(ComplexType data[kSize][kSize]) : data_(data) {}
@@ -94,8 +95,8 @@ public:
     return flattened_mat;
   }
 
-private:
+ private:
   ComplexType data_[kSize][kSize];
 };
 
-} // namespace quartz
+}  // namespace quartz

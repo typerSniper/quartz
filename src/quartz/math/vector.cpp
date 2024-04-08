@@ -9,7 +9,7 @@ namespace quartz {
 bool Vector::apply_matrix(MatrixBase *mat,
                           const std::vector<int> &qubit_indices) {
   const int n0 = (int)qubit_indices.size();
-  assert(n0 <= 30); // 1 << n0 does not overflow
+  assert(n0 <= 30);  // 1 << n0 does not overflow
   assert(mat->size() == (1 << n0));
   const int S = (int)data_.size();
   assert(S >= (1 << n0));
@@ -78,13 +78,14 @@ Vector Vector::random_generate(int num_qubits, std::mt19937 *gen) {
     gen = &static_gen;
   }
   static std::uniform_int_distribution<int> dis_int(0, 1);
+  assert(num_qubits <= 30);
   Vector result(1 << num_qubits);
-  int remaining_numbers = (2 << num_qubits);
+  unsigned int remaining_numbers = (2u << num_qubits);
 
 #ifdef USE_ARBLIB
   constexpr slong kRandPrec = 64;
   class FlintRandWrapper {
-  public:
+   public:
     FlintRandWrapper() { flint_randinit(state); }
     ~FlintRandWrapper() { flint_randclear(state); }
     flint_rand_t state{};
@@ -92,7 +93,7 @@ Vector Vector::random_generate(int num_qubits, std::mt19937 *gen) {
   static FlintRandWrapper flint_rand;
   arb_t remaining_norm;
   arb_init(remaining_norm);
-  arb_one(remaining_norm); // remaining_norm = 1;
+  arb_one(remaining_norm);  // remaining_norm = 1;
   arb_t number;
   arb_init(number);
 
@@ -110,20 +111,20 @@ Vector Vector::random_generate(int num_qubits, std::mt19937 *gen) {
       arb_urandom(number, flint_rand.state, kRandPrec);
       // number = random value in [0, 1] now
       arb_mul(tmp, number, remaining_norm, kRandPrec);
-      arb_set(number, tmp); // number *= remaining_norm;
+      arb_set(number, tmp);  // number *= remaining_norm;
       arb_div_si(tmp, number, remaining_numbers * 2, kRandPrec);
-      arb_set(number, tmp); // number /= remaining_numbers * 2;
+      arb_set(number, tmp);  // number /= remaining_numbers * 2;
     } else {
-      arb_set(number, remaining_norm); // number = remaining_norm;
+      arb_set(number, remaining_norm);  // number = remaining_norm;
     }
     remaining_numbers--;
     arb_sub(tmp, remaining_norm, number, kRandPrec);
-    arb_set(remaining_norm, tmp); // remaining_norm -= number;
+    arb_set(remaining_norm, tmp);  // remaining_norm -= number;
     arb_sqrt(tmp, number, kRandPrec);
-    arb_set(number, tmp); // number = std::sqrt(number);
+    arb_set(number, tmp);  // number = std::sqrt(number);
     if (dis_int(*gen)) {
       arb_neg(tmp, number);
-      arb_set(number, tmp); // number = -number;
+      arb_set(number, tmp);  // number = -number;
     }
     arb_clear(tmp);
     return number;
@@ -170,4 +171,4 @@ ComplexType Vector::dot(const Vector &other) const {
   return result;
 }
 
-} // namespace quartz
+}  // namespace quartz

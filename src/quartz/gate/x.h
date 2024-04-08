@@ -4,7 +4,7 @@
 
 namespace quartz {
 class XGate : public Gate {
-public:
+ public:
   XGate()
       : Gate(GateType::x, 1 /*num_qubits*/, 0 /*num_parameters*/),
         mat({{ComplexType(0), ComplexType(1)},
@@ -15,4 +15,4 @@ public:
   Matrix<2> mat;
 };
 
-} // namespace quartz
+}  // namespace quartz

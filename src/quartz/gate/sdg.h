@@ -5,7 +5,7 @@
 namespace quartz {
 
 class SDGGate : public Gate {
-public:
+ public:
   SDGGate()
       : Gate(GateType::sdg, 1 /*num_qubits*/, 0 /*num_parameters*/),
         mat({{1, 0}, {0, -1.0i}}) {}
@@ -15,4 +15,4 @@ public:
   bool is_diagonal() const override { return true; }
   Matrix<2> mat;
 };
-} // namespace quartz
+}  // namespace quartz

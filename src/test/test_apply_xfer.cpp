@@ -12,15 +12,18 @@ bool graph_cmp(std::shared_ptr<Graph> a, std::shared_ptr<Graph> b) {
 int main() {
   //   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
   //                GateType::cx, GateType::x, GateType::rz, GateType::add});
+  ParamInfo param_info;
   Context ctx({GateType::input_qubit, GateType::input_param, GateType::h,
-               GateType::cx, GateType::x, GateType::t, GateType::tdg});
+               GateType::cx, GateType::x, GateType::t, GateType::tdg},
+              &param_info);
 
   auto graph = Graph::from_qasm_file(
       &ctx, "../experiment/circs/t_tdg_circs/barenco_tof_3.qasm");
 
   EquivalenceSet eqs;
   // Load equivalent dags from file
-  if (!eqs.load_json(&ctx, "../clifford_t_305_complete_ECC_set.json")) {
+  if (!eqs.load_json(&ctx, "../clifford_t_305_complete_ECC_set.json",
+                     /*from_verifier=*/false)) {
     std::cout << "Failed to load equivalence file." << std::endl;
     assert(false);
   }

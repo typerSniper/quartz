@@ -7,6 +7,7 @@
 #include "assert.h"
 #include "quartz/circuitseq/circuitseq.h"
 #include "tasograph.h"
+
 #include <ostream>
 #include <queue>
 
@@ -20,8 +21,8 @@ struct TensorX {
   TensorX(void) : op(NULL), idx(0) {}
   TensorX(OpX *_op, int _idx) : op(_op), idx(_idx) {}
   Tensor to_edge(const GraphXfer *xfer) const;
-  OpX *op; // The op that outputs this tensor
-  int idx; // The output index of the op
+  OpX *op;  // The op that outputs this tensor
+  int idx;  // The output index of the op
   inline bool operator==(const TensorX &b) const {
     if (op != b.op)
       return false;
@@ -40,7 +41,7 @@ struct TensorXCompare {
 };
 
 class TensorXHash {
-public:
+ public:
   size_t operator()(const TensorX &a) const {
     std::hash<size_t> hash_fn;
     return hash_fn(a.idx) * 17 + hash_fn((size_t)(a.op));
@@ -48,20 +49,20 @@ public:
 };
 
 class OpX {
-public:
+ public:
   OpX(const OpX &_op);
   OpX(GateType _type);
   void add_input(const TensorX &input);
   void add_output(const TensorX &output);
 
-public:
+ public:
   GateType type;
   Op mapOp;
   std::vector<TensorX> inputs, outputs;
 };
 
 class GraphCompare {
-public:
+ public:
   GraphCompare() {
     cost_function_ = [](Graph *graph) { return graph->total_cost(); };
   }
@@ -72,15 +73,15 @@ public:
     return cost_function_(lhs.get()) > cost_function_(rhs.get());
   }
 
-private:
+ private:
   std::function<float(Graph *)> cost_function_;
 };
 
 class GraphXfer {
-public:
-  GraphXfer(Context *_context);
-  GraphXfer(Context *_context, const CircuitSeq *src_graph,
-            const CircuitSeq *dst_graph);
+ public:
+  GraphXfer(Context *src_ctx, Context *dst_ctx, Context *union_ctx);
+  GraphXfer(Context *src_ctx, Context *dst_ctx, Context *union_ctx,
+            const CircuitSeq *src_graph, const CircuitSeq *dst_graph);
   bool src_graph_connected(CircuitSeq *src_graph);
   TensorX new_tensor(void);
   bool is_input_qubit(const OpX *opx, int idx) const;
@@ -106,7 +107,7 @@ public:
   // TODO: not implemented
   //   std::string to_qasm(std::vector<OpX *> const &v) const;
 
-public:
+ public:
   static GraphXfer *create_GraphXfer(Context *_context,
                                      const CircuitSeq *src_graph,
                                      const CircuitSeq *dst_graph,
@@ -114,15 +115,21 @@ public:
   static GraphXfer *create_GraphXfer_from_qasm_str(Context *_context,
                                                    const std::string &src_str,
                                                    const std::string &dst_str);
-  static GraphXfer *create_single_gate_GraphXfer(Context *union_ctx,
-                                                 Command src_cmd,
-                                                 std::vector<Command> dst_cmds);
-  static std::pair<GraphXfer *, GraphXfer *> ccz_cx_rz_xfer(Context *ctx);
-  static std::pair<GraphXfer *, GraphXfer *> ccz_cx_u1_xfer(Context *ctx);
-  static std::pair<GraphXfer *, GraphXfer *> ccz_cx_t_xfer(Context *ctx);
+  static GraphXfer *
+  create_single_gate_GraphXfer(Context *src_ctx, Context *dst_ctx,
+                               Context *union_ctx, Command src_cmd,
+                               const std::vector<Command> &dst_cmds);
+  static std::pair<GraphXfer *, GraphXfer *>
+  ccz_cx_rz_xfer(Context *src_ctx, Context *dst_ctx, Context *union_ctx);
+  static std::pair<GraphXfer *, GraphXfer *>
+  ccz_cx_u1_xfer(Context *src_ctx, Context *dst_ctx, Context *union_ctx);
+  static std::pair<GraphXfer *, GraphXfer *>
+  ccz_cx_t_xfer(Context *src_ctx, Context *dst_ctx, Context *union_ctx);
 
-public:
-  Context *context;
+ public:
+  Context *src_ctx_;
+  Context *dst_ctx_;
+  Context *union_ctx_;
   int tensorId;
   std::unordered_map<Op, OpX *, OpHash> mappedOps;
   std::unordered_map<int, std::pair<Op, int>> mappedInputs;
@@ -132,4 +139,4 @@ public:
   std::unordered_map<int, ParamType> paramValues;
 };
 
-} // namespace quartz
+}  // namespace quartz

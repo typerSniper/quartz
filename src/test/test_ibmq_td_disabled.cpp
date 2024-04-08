@@ -26,14 +26,17 @@ int main(int argc, char **argv) {
   parse_args(argv, argc, simulated_annealing, early_stop, input_fn, output_fn,
              eqset_fn);
   // Construct contexts
+  ParamInfo param_info;
   Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,
-                   GateType::t, GateType::input_qubit, GateType::input_param});
+                   GateType::t, GateType::input_qubit, GateType::input_param},
+                  &param_info);
   Context dst_ctx({GateType::u1, GateType::u2, GateType::u3, GateType::add,
-                   GateType::cx, GateType::input_qubit, GateType::input_param});
+                   GateType::cx, GateType::input_qubit, GateType::input_param},
+                  &param_info);
   auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
 
   // Construct GraphXfers for toffoli flip
-  auto xfer_pair = GraphXfer::ccz_cx_u1_xfer(&union_ctx);
+  auto xfer_pair = GraphXfer::ccz_cx_u1_xfer(&src_ctx, &dst_ctx, &union_ctx);
   // Load qasm file
   QASMParser qasm_parser(&src_ctx);
   CircuitSeq *dag = nullptr;

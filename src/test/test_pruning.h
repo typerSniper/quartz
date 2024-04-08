@@ -3,6 +3,7 @@
 #include "quartz/context/context.h"
 #include "quartz/generator/generator.h"
 
+#include <cassert>
 #include <chrono>
 #include <fstream>
 
@@ -15,7 +16,8 @@ void test_pruning(
     int max_num_param_gates = 1, bool run_representative_pruning = true,
     bool run_original = true, bool run_original_unverified = false,
     bool run_original_verified = true, bool unique_parameters = false) {
-  Context ctx(supported_gates, num_qubits, num_input_parameters);
+  ParamInfo param_info(/*num_input_symbolic_params=*/num_input_parameters);
+  Context ctx(supported_gates, num_qubits, &param_info);
   Generator gen(&ctx);
 
   EquivalenceSet equiv_set;
@@ -38,8 +40,8 @@ void test_pruning(
         fin.close();
       }
       start = std::chrono::steady_clock::now();
-      gen.generate(num_qubits, num_input_parameters, max_num_quantum_gates,
-                   max_num_param_gates, &dataset1, /*invoke_python_verifier=*/
+      gen.generate(num_qubits, max_num_quantum_gates,
+                   &dataset1, /*invoke_python_verifier=*/
                    true, &equiv_set, unique_parameters, /*verbose=*/
                    true, &verification_time);
       end = std::chrono::steady_clock::now();
@@ -80,7 +82,8 @@ void test_pruning(
     system(("python src/python/verifier/verify_equivalences.py " + file_prefix +
             "pruning_unverified.json " + file_prefix + "pruning.json")
                .c_str());
-    equiv_set.load_json(&ctx, file_prefix + "pruning.json");
+    equiv_set.load_json(&ctx, file_prefix + "pruning.json",
+                        /*from_verifier=*/true);
     end = std::chrono::steady_clock::now();
     running_time_with_all_pruning_techniques += end - start;
     verification_time += end - start;
@@ -117,7 +120,8 @@ void test_pruning(
                        true,  /*common_subcircuit_pruning=*/
                        false, /*other_simplification=*/
                        true);
-    equiv_set.save_json(file_prefix + "pruning_other_simplification.json");
+    equiv_set.save_json(&ctx,
+                        file_prefix + "pruning_other_simplification.json");
     end = std::chrono::steady_clock::now();
     std::cout << std::dec << "Representative pruning: there are "
               << equiv_set.num_total_dags() << " circuits in "
@@ -135,10 +139,11 @@ void test_pruning(
               << std::endl;
 
     equiv_set.clear();
-    equiv_set.load_json(&ctx, file_prefix + "pruning.json");
+    equiv_set.load_json(&ctx, file_prefix + "pruning.json",
+                        /*from_verifier=*/true);
     start = std::chrono::steady_clock::now();
     equiv_set.simplify(&ctx);
-    equiv_set.save_json(file_prefix + "pruning_simplified.json");
+    equiv_set.save_json(&ctx, file_prefix + "pruning_simplified.json");
     end = std::chrono::steady_clock::now();
     running_time_with_all_pruning_techniques += end - start;
     std::cout << std::dec << "Representative pruning: there are "
@@ -178,36 +183,9 @@ void test_pruning(
       }
       if (use_generated_file_if_possible) {
         std::cout << (file_prefix + "original_unverified.json")
-                  << " not found. Generating..." << std::endl;
+                  << " not found. generate_dfs() deprecated." << std::endl;
+        assert(false);
       }
-      start = std::chrono::steady_clock::now();
-      gen.generate_dfs(num_qubits, num_input_parameters, max_num_quantum_gates,
-                       max_num_param_gates, dataset1, /*restrict_search_space=*/
-                       false, unique_parameters);
-      end = std::chrono::steady_clock::now();
-      std::cout
-          << std::dec << "Original: " << dataset1.num_total_dags()
-          << " circuits with " << dataset1.num_hash_values()
-          << " different hash values are found in "
-          << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                 end - start)
-                     .count() /
-                 1000.0
-          << " seconds." << std::endl;
-
-      num_singletons = dataset1.remove_singletons(&ctx);
-      std::cout << num_singletons << " singletons removed." << std::endl;
-
-      start = std::chrono::steady_clock::now();
-      dataset1.save_json(&ctx, file_prefix + "original_unverified.json");
-      end = std::chrono::steady_clock::now();
-      std::cout
-          << std::dec << "Original: json saved in "
-          << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
-                 end - start)
-                     .count() /
-                 1000.0
-          << " seconds." << std::endl;
     }
 
     ctx.clear_representatives();
@@ -239,7 +217,8 @@ void test_pruning(
                 file_prefix + "original_unverified.json " + file_prefix +
                 "original.json -n")
                    .c_str());
-        equiv_set.load_json(&ctx, file_prefix + "original.json");
+        equiv_set.load_json(&ctx, file_prefix + "original.json",
+                            /*from_verifier=*/true);
         end = std::chrono::steady_clock::now();
         if (missing_num_singletons) {
           std::cout << "Warning: missing num_singletons. The following two "
@@ -286,7 +265,8 @@ void test_pruning(
               file_prefix + "original_unverified.json " + file_prefix +
               "original_verified.json")
                  .c_str());
-      equiv_set.load_json(&ctx, file_prefix + "original_verified.json");
+      equiv_set.load_json(&ctx, file_prefix + "original_verified.json",
+                          /*from_verifier=*/true);
       end = std::chrono::steady_clock::now();
       if (missing_num_singletons) {
         std::cout << "Warning: missing num_singletons. The following two lines "

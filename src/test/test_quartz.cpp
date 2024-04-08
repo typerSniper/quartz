@@ -44,17 +44,20 @@ int main(int argc, char **argv) {
   fprintf(stderr, "Input qasm file: %s\n", input_fn.c_str());
 
   // Construct contexts
+  ParamInfo param_info;
   Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,
-                   GateType::input_qubit, GateType::input_param});
+                   GateType::input_qubit, GateType::input_param},
+                  &param_info);
   Context dst_ctx({GateType::h, GateType::x, GateType::rz, GateType::add,
-                   GateType::cx, GateType::input_qubit, GateType::input_param});
+                   GateType::cx, GateType::input_qubit, GateType::input_param},
+                  &param_info);
   auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
 
   // Construct GraphXfers for toffoli flip
   // Use this for voqc gate set(h, rz, x, cx)
   //   auto xfer_pair = TASOGraph::GraphXfer::ccz_cx_rz_xfer(&union_ctx);
   // Use this for ibmq gate set(u1, u2, u3, cx)
-  auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&union_ctx);
+  auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&src_ctx, &dst_ctx, &union_ctx);
   // Load qasm file
   QASMParser qasm_parser(&src_ctx);
   CircuitSeq *dag = nullptr;

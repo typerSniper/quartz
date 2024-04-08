@@ -2,11 +2,12 @@
 
 #include "../math/matrix.h"
 #include "gate.h"
+
 #include <assert.h>
 
 namespace quartz {
 class CCXGate : public Gate {
-public:
+ public:
   CCXGate()
       : Gate(GateType::ccx, 3 /*num_qubits*/, 0 /*num_parameters*/),
         mat({{1, 0, 0, 0, 0, 0, 0, 0},
@@ -23,4 +24,4 @@ public:
   Matrix<8> mat;
 };
 
-} // namespace quartz
+}  // namespace quartz

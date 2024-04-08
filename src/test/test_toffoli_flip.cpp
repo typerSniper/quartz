@@ -22,22 +22,24 @@ int main() {
   //                       "-0.25pi; rz q1 -0.25pi; rz q2 -0.25pi;"});
   auto rules = RuleParser::ccz_cx_t_rules();
   // Construct contexts
+  ParamInfo param_info;
   Context src_ctx({GateType::h, GateType::ccz, GateType::input_qubit,
-                   GateType::input_param});
+                   GateType::input_param},
+                  &param_info);
   Context dst_ctx({GateType::t, GateType::tdg, GateType::cx, GateType::h,
-                   GateType::input_qubit, GateType::input_param});
+                   GateType::input_qubit, GateType::input_param},
+                  &param_info);
   Context union_ctx({GateType::ccz, GateType::t, GateType::tdg, GateType::cx,
-                     GateType::h, GateType::input_qubit,
-                     GateType::input_param});
+                     GateType::h, GateType::input_qubit, GateType::input_param},
+                    &param_info);
   // Construct GraphXfers
-  std::vector<Command> cmds;
-  Command cmd;
-  rules.first->find_convert_commands(&dst_ctx, GateType::ccz, cmd, cmds);
-  //   GraphXfer *xfer =
-  //       GraphXfer::create_single_gate_GraphXfer(&union_ctx, cmd, cmds);
-  //   rules.second->find_convert_commands(&dst_ctx, GateType::ccz, cmd, cmds);
-  //   GraphXfer *xfer_inverse =
-  //       GraphXfer::create_single_gate_GraphXfer(&union_ctx, cmd, cmds);
+  std::vector<std::vector<Command>> cmds;
+  std::vector<Command> cmd;
+  rules.find_convert_commands(&dst_ctx, GateType::ccz, cmd, cmds);
+  GraphXfer *xfer = GraphXfer::create_single_gate_GraphXfer(
+      &src_ctx, &dst_ctx, &union_ctx, cmd[0], cmds[0]);
+  GraphXfer *xfer_inverse = GraphXfer::create_single_gate_GraphXfer(
+      &src_ctx, &dst_ctx, &union_ctx, cmd[1], cmds[1]);
   // Load qasm file
   QASMParser qasm_parser(&src_ctx);
   CircuitSeq *dag = nullptr;

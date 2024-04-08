@@ -1,11 +1,11 @@
+#include "quartz/context/context.h"
+#include "quartz/tasograph/substitution.h"
+#include "quartz/tasograph/tasograph.h"
+
 #include <chrono>
 #include <iostream>
 #include <thread>
 #include <vector>
-
-#include "quartz/context/context.h"
-#include "quartz/tasograph/substitution.h"
-#include "quartz/tasograph/tasograph.h"
 
 using namespace quartz;
 
@@ -94,8 +94,8 @@ int test() {
       std::this_thread::sleep_for(std::chrono::milliseconds(10 * 1000));
       std::cout << "Clear..." << std::endl;
       for (int i = 0; i < buffer.size(); i++) {
-        buffer[i].reset(); // unecessary actually; clear can lead to
-                           // deconstruction of graphs pointed to
+        buffer[i].reset();  // unecessary actually; clear can lead to
+                            // deconstruction of graphs pointed to
       }
       buffer.clear();
       buffer.shrink_to_fit();

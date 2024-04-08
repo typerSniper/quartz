@@ -1,6 +1,7 @@
 #include "quartz/parser/qasm_parser.h"
 #include "quartz/tasograph/substitution.h"
 #include "test/gen_ecc_set.h"
+
 #include <cmath>
 #include <filesystem>
 #include <sstream>
@@ -18,13 +19,16 @@ static std::stringstream summary_result;
 void benchmark_nam(const std::string &circuit_name) {
   std::string circuit_path = "circuit/nam-benchmarks/" + circuit_name + ".qasm";
   // Construct contexts
+  ParamInfo param_info;
   Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,
-                   GateType::input_qubit, GateType::input_param});
+                   GateType::add, GateType::input_qubit, GateType::input_param},
+                  &param_info);
   Context dst_ctx({GateType::h, GateType::x, GateType::rz, GateType::add,
-                   GateType::cx, GateType::input_qubit, GateType::input_param});
+                   GateType::cx, GateType::input_qubit, GateType::input_param},
+                  &param_info);
   auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
 
-  auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&union_ctx);
+  auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&src_ctx, &dst_ctx, &union_ctx);
   // Load qasm file
   QASMParser qasm_parser(&src_ctx);
   CircuitSeq *dag = nullptr;
@@ -97,11 +101,11 @@ int main() {
     std::cout << "ECC set generated." << std::endl;
   }
   // Logs are printed to Nam_4_3_tof_3.log, Nam_4_3_barenco_tof_3.log, ...
-  benchmark_nam("tof_3");         // 45 gates
-  benchmark_nam("barenco_tof_3"); // 58 gates
-  benchmark_nam("mod_mult_55");   // 119 gates
-  benchmark_nam("vbe_adder_3");   // 150 gates
-  benchmark_nam("gf2^4_mult");    // 225 gates
+  benchmark_nam("tof_3");          // 45 gates
+  benchmark_nam("barenco_tof_3");  // 58 gates
+  benchmark_nam("mod_mult_55");    // 119 gates
+  benchmark_nam("vbe_adder_3");    // 150 gates
+  benchmark_nam("gf2^4_mult");     // 225 gates
   if (num_benchmark > 0) {
     std::cout << "Summary:" << std::endl;
     std::cout << summary_result.str();

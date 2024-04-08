@@ -24,7 +24,7 @@ namespace quartz {
 bool equal_to_2k_pi(double d);
 
 class Op {
-public:
+ public:
   Op(void);
   Op(size_t _guid, Gate *_ptr) : guid(_guid), ptr(_ptr) {}
   inline bool operator==(const Op &b) const {
@@ -62,13 +62,13 @@ public:
   }
   static const Op INVALID_OP;
 
-public:
+ public:
   size_t guid;
   Gate *ptr;
 };
 
 class OpCompare {
-public:
+ public:
   bool operator()(const Op &a, const Op &b) const {
     if (a.guid != b.guid)
       return a.guid < b.guid;
@@ -77,7 +77,7 @@ public:
 };
 
 class OpHash {
-public:
+ public:
   size_t operator()(const Op &a) const {
     std::hash<size_t> hash_fn;
     return hash_fn(a.guid) * 17 + hash_fn((size_t)(a.ptr));
@@ -85,7 +85,7 @@ public:
 };
 
 class Pos {
-public:
+ public:
   Pos() {
     op = Op();
     idx = 0;
@@ -127,7 +127,7 @@ inline bool operator!=(const Pos &a, const Pos &b) {
 }
 
 class PosHash {
-public:
+ public:
   size_t operator()(const Pos &a) const {
     std::hash<size_t> hash_fn;
     OpHash op_hash;
@@ -136,7 +136,7 @@ public:
 };
 
 class PosCompare {
-public:
+ public:
   bool operator()(const Pos &a, const Pos &b) const {
     if (a.op != b.op)
       return a.op < b.op;
@@ -145,7 +145,7 @@ public:
 };
 
 class Tensor {
-public:
+ public:
   Tensor(void);
   int idx;
   Op op;
@@ -176,7 +176,7 @@ class GraphXfer;
 class OpX;
 
 class Graph {
-public:
+ public:
   Graph(Context *ctx);
   Graph(Context *ctx, const CircuitSeq *seq);
   Graph(const Graph &graph);
@@ -245,7 +245,7 @@ public:
            const std::string &circuit_name, bool print_message,
            std::function<float(Graph *)> cost_function = nullptr,
            double cost_upper_bound = -1 /*default = current cost * 1.05*/,
-           int timeout = 3600 /*1 hour*/);
+           double timeout = 3600 /*1 hour*/);
   /**
    * Optimize this circuit.
    * @param xfers The circuit transformations.
@@ -263,7 +263,7 @@ public:
            const std::string &circuit_name, const std::string &log_file_name,
            bool print_message,
            std::function<float(Graph *)> cost_function = nullptr,
-           int timeout = 3600 /*1 hour*/);
+           double timeout = 3600 /*1 hour*/);
   void constant_and_rotation_elimination();
   void rotation_merging(GateType target_rotation);
   std::string to_qasm(bool print_result = false, bool print_id = false) const;
@@ -315,8 +315,14 @@ public:
   subgraph(const std::unordered_set<Op, OpHash> &ops) const;
   std::vector<std::shared_ptr<Graph>>
   topology_partition(const int partition_gate_count) const;
+  /**
+   * Return the parameter value if the Op is a constant parameter,
+   * or return 0 otherwise.
+   */
+  ParamType get_param_value(const Op &op) const;
+  bool param_has_value(const Op &op) const;
 
-private:
+ private:
   void replace_node(Op oldOp, Op newOp);
   void remove_edge(Op srcOp, Op dstOp);
   uint64_t xor_bitmap(uint64_t src_bitmap, int src_idx, uint64_t dst_bitmap,
@@ -340,13 +346,13 @@ private:
       GraphXfer *xfer, Op op,
       std::deque<std::pair<OpX *, Op>> &matched_opx_op_pairs_dq) const;
 
-public:
+ public:
   size_t special_op_guid;
   Context *context;
   std::map<Op, std::set<Edge, EdgeCompare>, OpCompare> inEdges, outEdges;
-  std::map<Op, ParamType> constant_param_values;
   std::unordered_map<Op, int, OpHash> input_qubit_op_2_qubit_idx;
   std::unordered_map<Pos, int, PosHash> pos_2_logical_qubit;
+  std::unordered_map<Op, int, OpHash> param_idx;
 };
 
-}; // namespace quartz
+}  // namespace quartz

@@ -13,7 +13,7 @@ using KernelCostType = double;
  * A class for the cost function of kernels.
  */
 class KernelCost {
-public:
+ public:
   /**
    * The cost function of kernels.
    * @param fusion_kernel_costs An array of costs for fusion kernels.
@@ -68,4 +68,4 @@ public:
   int optimal_fusion_kernel_size_;
 };
 
-} // namespace quartz
+}  // namespace quartz

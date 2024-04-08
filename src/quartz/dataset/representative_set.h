@@ -6,7 +6,7 @@
 namespace quartz {
 
 class RepresentativeSet {
-public:
+ public:
   bool load_json(Context *ctx, const std::string &file_name);
 
   bool save_json(const std::string &file_name) const;
@@ -31,8 +31,8 @@ public:
   // Sort the circuits in this equivalence class by CircuitSeq::less_than().
   void sort();
 
-private:
+ private:
   std::vector<std::unique_ptr<CircuitSeq>> dags_;
 };
 
-} // namespace quartz
+}  // namespace quartz

@@ -47,13 +47,16 @@ int main(int argc, char **argv) {
   auto fn = input_fn.substr(input_fn.rfind('/') + 1);
 
   // Construct contexts
-  Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx, GateType::rz,
-                   GateType::input_qubit, GateType::input_param});
+  ParamInfo param_info;
+  Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,
+                   GateType::input_qubit, GateType::input_param},
+                  &param_info);
   Context dst_ctx({GateType::h, GateType::x, GateType::rz, GateType::add,
-                   GateType::cx, GateType::input_qubit, GateType::input_param});
+                   GateType::cx, GateType::input_qubit, GateType::input_param},
+                  &param_info);
   auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
 
-  auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&union_ctx);
+  auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&src_ctx, &dst_ctx, &union_ctx);
   // Load qasm file
   QASMParser qasm_parser(&src_ctx);
   CircuitSeq *dag = nullptr;
