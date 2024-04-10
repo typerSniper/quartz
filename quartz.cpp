@@ -39,8 +39,9 @@ int write_qasm_to_buffer (std::string cqasm, char* buffer, int buff_size) {
 extern "C" long unsigned int load_eqset_ (const char* eqset_fn_, unsigned char** store) {
   std::string eqset_fn(eqset_fn_);
   EquivalenceSet* eqs = new EquivalenceSet();
-  auto gctxt = Context(gate_set);
-  if (!eqs->load_json(&gctxt, eqset_fn)) {
+  ParamInfo* param_info = new ParamInfo();
+  auto gctxt = Context(gate_set, param_info);
+  if (!eqs->load_json(&gctxt, eqset_fn, false)) {
     std::cout << "Failed to load equivalence file \"" << eqset_fn
               << "\"." << std::endl;
     assert(false);
@@ -86,8 +87,9 @@ extern "C" long unsigned int load_greedy_xfers_ (const char* eqset_fn_, unsigned
   std::istringstream iss(eqset_fn);
 
   EquivalenceSet* eqs = new EquivalenceSet();
-  Context *ctxt = new Context(gate_set);
-  if (!eqs->load_json(ctxt, iss)) {
+  ParamInfo* param_info = new ParamInfo();
+  Context *ctxt = new Context(gate_set, param_info);
+  if (!eqs->load_json(ctxt, iss, false)) {
     std::cout << "Failed to load equivalence file \"" << "whe"
               << "\"." << std::endl;
     assert(false);
@@ -111,8 +113,9 @@ extern "C" void load_xfers_ (const char* eqset_fn_,
   std::istringstream iss(eqset_fn);
 
   EquivalenceSet* eqs = new EquivalenceSet();
-  Context *ctxt = new Context(gate_set);
-  if (!eqs->load_json(ctxt, iss)) {
+  ParamInfo* param_info = new ParamInfo();
+  Context *ctxt = new Context (gate_set, param_info);
+  if (!eqs->load_json(ctxt, iss, false)) {
     std::cout << "Failed to load equivalence file \"" << "whe"
               << "\"." << std::endl;
     assert(false);
@@ -152,9 +155,9 @@ extern "C" void load_xfers_ (const char* eqset_fn_,
 extern "C" int preprocess_ (const char* cqasm_, char* buffer, int buff_size) {
 
   std::string cqasm(cqasm_);
-
+  ParamInfo* param_info = new ParamInfo();
   Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx, GateType::rz,
-                   GateType::input_qubit, GateType::input_param});
+                   GateType::input_qubit, GateType::input_param}, param_info);
 
 
 
@@ -165,11 +168,12 @@ extern "C" int preprocess_ (const char* cqasm_, char* buffer, int buff_size) {
     return -1;
   }
   auto graph = Graph::from_qasm_str (&src_ctx, cqasm);
+  ParamInfo* param_info2 = new ParamInfo();
   Context dst_ctx({GateType::h, GateType::x, GateType::rz, GateType::add,
-                   GateType::cx, GateType::input_qubit, GateType::input_param});
+                   GateType::cx, GateType::input_qubit, GateType::input_param}, param_info2);
 
   auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
-  auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&union_ctx);
+  auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&src_ctx, &dst_ctx, &union_ctx);
   auto new_graph = graph->toffoli_flip_greedy(GateType::rz, xfer_pair.first, xfer_pair.second);
   new_graph->constant_and_rotation_elimination();
 
@@ -205,11 +209,13 @@ extern "C" int opt_circuit_ (const char* cqasm_, int timeout, char* buffer, int 
   Context* ctxt;
   if (xfers.size () == 0) {
     // ctxt = new_ctxt(gctxt) ;
-    ctxt = new Context (gate_set);
+    ParamInfo* param_info = new ParamInfo();
+    ctxt = new Context (gate_set, param_info);
   } else {
-    ctxt = xfers[0]->context;
+    std::cout << "reusing context\n";
+    ctxt = xfers[0]->dst_ctx_;
   }
-
+  std::cout << "pinfo " << ctxt->param_info_to_json() << std::endl;
   auto graph = Graph::from_qasm_str (ctxt, cqasm);
 
   auto start = std::chrono::steady_clock::now();
@@ -218,7 +224,13 @@ extern "C" int opt_circuit_ (const char* cqasm_, int timeout, char* buffer, int 
   // auto graph_after_search = graph.greedy_optimize(ctxt, eqset_fn, /*print_message=*/ false);
   std::cout << "timeout received = " << timeout << std::endl;
   std::shared_ptr<Graph> graph_after_search;
+  std::shared_ptr<Graph> graph_after_search2;
+  timeout = 0;
   if (timeout == 0) {
+    std::cout << "calling here\n";
+    graph_after_search = graph->greedy_optimize(ctxt, "lib/quartz/Nam_6_3_complete_ECC_set.json", /*print_message=*/ false, gcost_function);
+    std::cout << "pinfo " << ctxt->param_info_to_json() << std::endl;
+
     graph_after_search = graph->greedy_optimize_with_xfers(ctxt, xfers, /*print_message=*/ false, gcost_function);
   }
   else if (timeout < 0) {
@@ -234,6 +246,7 @@ extern "C" int opt_circuit_ (const char* cqasm_, int timeout, char* buffer, int 
   std::cout << " Cost function optimized from: "
             << gcost_function (graph.get()) << " to "
             << gcost_function(graph_after_search.get()) << ", "
+            // << "third = " << gcost_function(graph_after_search2.get()) << " "
             << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                    end - start)
                        .count() /
@@ -251,6 +264,7 @@ extern "C" int opt_circuit_ (const char* cqasm_, int timeout, char* buffer, int 
   }
 
   *xfers_ptr = xfers;
+  exit(1);
   return write_qasm_to_buffer(cqasm2, buffer, buff_size);
   // std::cout << "circuit after opt = ";
   // std::cout << cqasm2.c_str() << std::endl;
