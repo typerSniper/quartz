@@ -1698,7 +1698,7 @@ std::shared_ptr<Graph> Graph::greedy_optimize(Context *ctx, const std::string &e
     assert(false);
   }
   auto eccs = eqs.get_all_equivalence_sets();
-    std::vector<GraphXfer *> xfers;
+  std::vector<GraphXfer *> xfers;
 
   if (cost_function == nullptr) {
     cost_function = [](Graph *graph) { return graph->total_cost(); };

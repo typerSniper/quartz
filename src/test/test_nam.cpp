@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
 
   // Construct contexts
   ParamInfo param_info;
-  Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,
+  Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx, GateType::rz,
                    GateType::input_qubit, GateType::input_param},
                   &param_info);
   Context dst_ctx({GateType::h, GateType::x, GateType::rz, GateType::add,
