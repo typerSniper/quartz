@@ -5,7 +5,7 @@
 using namespace quartz;
 
 void parse_args(char **argv, int argc, bool &simulated_annealing,
-                bool &early_stop, bool &disable_search, int& timeout,
+                bool &early_stop, bool &disable_search, int &timeout,
                 std::string &input_filename, std::string &output_filename,
                 std::string &eqset_filename) {
   assert(argv[1] != nullptr);
@@ -42,14 +42,14 @@ int main(int argc, char **argv) {
   bool early_stop = false;
   bool disable_search = false;
   int timeout = 60;
-  parse_args(argv, argc, simulated_annealing, early_stop, disable_search, timeout,
-             input_fn, output_fn, eqset_fn);
+  parse_args(argv, argc, simulated_annealing, early_stop, disable_search,
+             timeout, input_fn, output_fn, eqset_fn);
   auto fn = input_fn.substr(input_fn.rfind('/') + 1);
 
   // Construct contexts
   ParamInfo param_info;
-  Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx, GateType::rz,
-                   GateType::input_qubit, GateType::input_param},
+  Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,
+                   GateType::rz, GateType::input_qubit, GateType::input_param},
                   &param_info);
   Context dst_ctx({GateType::h, GateType::x, GateType::rz, GateType::add,
                    GateType::cx, GateType::input_qubit, GateType::input_param},
@@ -64,8 +64,6 @@ int main(int argc, char **argv) {
     std::cout << "Parser failed" << std::endl;
   }
   Graph graph(&src_ctx, dag);
-
-
 
   auto start = std::chrono::steady_clock::now();
   // Greedy toffoli flip
@@ -82,7 +80,8 @@ int main(int argc, char **argv) {
   //             << graph_before_search->gate_count() << ", "
   //             << "Circuit depth: " << graph_before_search->circuit_depth()
   //             << ", "
-  //             << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
+  //             <<
+  //             (double)std::chrono::duration_cast<std::chrono::milliseconds>(
   //                    end - start)
   //                        .count() /
   //                    1000.0
@@ -91,26 +90,30 @@ int main(int argc, char **argv) {
   //   return 0;
   // }
 
-    // Optimization
+  // Optimization
   start = std::chrono::steady_clock::now();
   std::shared_ptr<Graph> graph_after_search;
   if (disable_search) {
-    std::cout << "calling gopt" <<std::endl;
-    graph_after_search = graph_before_search->greedy_optimize(&dst_ctx, eqset_fn, true, nullptr, timeout);
-  }
-  else {
+    std::cout << "calling gopt" << std::endl;
+    graph_after_search = graph_before_search->greedy_optimize(
+        &dst_ctx, eqset_fn, true, nullptr, timeout);
+  } else {
     std::cout << "general search" << std::endl;
     auto t0 = std::chrono::steady_clock::now();
-    auto greedy_graph = graph_before_search->greedy_optimize(&dst_ctx, eqset_fn, true, nullptr, timeout);
+    auto greedy_graph = graph_before_search->greedy_optimize(
+        &dst_ctx, eqset_fn, true, nullptr, timeout);
     auto t1 = std::chrono::steady_clock::now();
-    auto rem = timeout - std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count()/1000.0;
+    auto rem =
+        timeout -
+        std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() /
+            1000.0;
     std::cout << "running search with remaining time " << rem << std::endl;
     if (rem > 0) {
-      graph_after_search = greedy_graph->optimize(&dst_ctx, eqset_fn, fn, true, nullptr, -1, rem);
-    }
-    else {
+      graph_after_search = greedy_graph->optimize(&dst_ctx, eqset_fn, fn, true,
+                                                  nullptr, -1, rem);
+    } else {
       graph_after_search = greedy_graph;
-      std::cout << "(0.0, " << greedy_graph->gate_count()<<");\n";
+      std::cout << "(0.0, " << greedy_graph->gate_count() << ");\n";
     }
   }
   end = std::chrono::steady_clock::now();
