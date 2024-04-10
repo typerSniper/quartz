@@ -103,10 +103,8 @@ class EquivalenceSet {
    */
   bool load_json(Context *ctx, const std::string &file_name, bool from_verifier,
                  std::vector<CircuitSeq *> *new_representatives = nullptr);
-  bool load_json(Context *ctx, std::istream& fin,
-                               bool from_verifier,
-                               std::vector<CircuitSeq *> *new_representatives = nullptr);
-
+  bool load_json(Context *ctx, std::istream &fin, bool from_verifier,
+                 std::vector<CircuitSeq *> *new_representatives = nullptr);
 
   bool save_json(Context *ctx, const std::string &file_name) const;
 

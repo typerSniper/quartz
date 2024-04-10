@@ -1554,21 +1554,25 @@ void Graph::draw_circuit(const std::string &src_file_name,
              .c_str());
 }
 
-std::string log_str (std::chrono::time_point<std::chrono::steady_clock> t, float cost) {
+std::string log_str(std::chrono::time_point<std::chrono::steady_clock> t,
+                    float cost) {
   auto current = std::chrono::steady_clock::now();
-  auto td = (double)std::chrono::duration_cast<std::chrono::milliseconds>(current - t).count()/1000.0;
- return "(" + std::to_string(td) + ", " + std::to_string(cost)+");";
+  auto td =
+      (double)std::chrono::duration_cast<std::chrono::milliseconds>(current - t)
+          .count() /
+      1000.0;
+  return "(" + std::to_string(td) + ", " + std::to_string(cost) + ");";
 }
 
-void write_file (std::string fn, std::string contents) {
+void write_file(std::string fn, std::string contents) {
   std::ofstream file(fn, std::ofstream::out | std::ofstream::trunc);
   file << contents;
   file.close();
 }
 
-std::shared_ptr<Graph> Graph::greedy_optimize_with_xfers (
-  Context *ctx, std::vector<GraphXfer *> &xfers,
-  bool print_message, std::function<float(Graph *)> cost_function, int timeout) {
+std::shared_ptr<Graph> Graph::greedy_optimize_with_xfers(
+    Context *ctx, std::vector<GraphXfer *> &xfers, bool print_message,
+    std::function<float(Graph *)> cost_function, int timeout) {
   if (cost_function == nullptr) {
     cost_function = [](Graph *graph) { return graph->total_cost(); };
   }
@@ -1599,7 +1603,8 @@ std::shared_ptr<Graph> Graph::greedy_optimize_with_xfers (
   //   for (int i = 0; i < ecc_size; i++) {
   //     if (graph_cost[i] != graph_cost[representative_id]) {
   //       auto xfer = GraphXfer::create_GraphXfer(ctx, ecc[i],
-  //                                               ecc[representative_id], true);
+  //                                               ecc[representative_id],
+  //                                               true);
   //       if (xfer != nullptr) {
   //         xfers.push_back(xfer);
   //       }
@@ -1618,7 +1623,7 @@ std::shared_ptr<Graph> Graph::greedy_optimize_with_xfers (
   optimized_graph->topology_order_ops(all_nodes);
   auto og_start = std::chrono::steady_clock::now();
   auto start = og_start;
-  std::string log = log_str (og_start, original_cost);
+  std::string log = log_str(og_start, original_cost);
   double apply_xfer_time = 0;
   do {
     optimized_in_this_iteration = false;
@@ -1633,7 +1638,10 @@ std::shared_ptr<Graph> Graph::greedy_optimize_with_xfers (
         auto new_graph = optimized_graph->apply_xfer(
             xfer, node, context->has_parameterized_gate());
         auto end_apply_xfer = std::chrono::steady_clock::now();
-        apply_xfer_time+=(double)std::chrono::duration_cast<std::chrono::microseconds>(end_apply_xfer - start_apply_xfer).count();
+        apply_xfer_time +=
+            (double)std::chrono::duration_cast<std::chrono::microseconds>(
+                end_apply_xfer - start_apply_xfer)
+                .count();
         num_visits++;
         if (new_graph) {
           optimized_graph.swap(new_graph);
@@ -1653,26 +1661,35 @@ std::shared_ptr<Graph> Graph::greedy_optimize_with_xfers (
       }
       // } while (optimized_this_xfer);
       auto end = std::chrono::steady_clock::now();
-      auto te = (int)std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / 1000.0;
+      auto te = (int)std::chrono::duration_cast<std::chrono::milliseconds>(
+                    end - start)
+                    .count() /
+                1000.0;
       if (te > timeout) {
         if (print_message) {
-          log += log_str (og_start, cost_function(optimized_graph.get()));
+          log += log_str(og_start, cost_function(optimized_graph.get()));
           std::cout << log << std::endl;
         }
-        std::cout << "timed out. "<<std::endl;
+        std::cout << "timed out. " << std::endl;
         return optimized_graph;
       }
       if (optimized_in_this_iteration && it != xfers.begin()) {
-        std::rotate (xfers.begin(), it, it + 1);
+        std::rotate(xfers.begin(), it, it + 1);
         break;
       }
     }
   } while (optimized_in_this_iteration);
   auto end = std::chrono::steady_clock::now();
-  std::cout << "loop time " << (int)std::chrono::duration_cast<std::chrono::milliseconds>(end - og_start).count() / 1000.0 << std::endl;
+  std::cout << "loop time "
+            << (int)std::chrono::duration_cast<std::chrono::milliseconds>(
+                   end - og_start)
+                       .count() /
+                   1000.0
+            << std::endl;
 
   std::cout << "total nodes visited = " << num_visits << std::endl;
-  // std::cout << "time in for loop " <<(double)std::chrono::duration_cast<std::chrono::milliseconds>(
+  // std::cout << "time in for loop "
+  // <<(double)std::chrono::duration_cast<std::chrono::milliseconds>(
   //                  end - start)
   //                      .count() /
   //                  1000.0
@@ -1687,9 +1704,9 @@ std::shared_ptr<Graph> Graph::greedy_optimize_with_xfers (
   return optimized_graph;
 }
 
-
-std::shared_ptr<Graph> Graph::greedy_optimize(Context *ctx, const std::string &equiv_file_name,
-  bool print_message, std::function<float(Graph *)> cost_function, int timeout) {
+std::shared_ptr<Graph> Graph::greedy_optimize(
+    Context *ctx, const std::string &equiv_file_name, bool print_message,
+    std::function<float(Graph *)> cost_function, int timeout) {
   EquivalenceSet eqs;
   // Load equivalent dags from file
   if (!eqs.load_json(ctx, equiv_file_name, /*from_verifier=*/false)) {
@@ -1727,9 +1744,9 @@ std::shared_ptr<Graph> Graph::greedy_optimize(Context *ctx, const std::string &e
     }
   }
   std::cout << "greedy xfers = " << xfers.size() << std::endl;
-  return greedy_optimize_with_xfers(ctx, xfers, print_message, cost_function, timeout);
+  return greedy_optimize_with_xfers(ctx, xfers, print_message, cost_function,
+                                    timeout);
 }
-
 
 std::shared_ptr<Graph> Graph::optimize_legacy(
     float alpha, int budget, bool print_subst, Context *ctx,
@@ -2041,13 +2058,13 @@ Graph::optimize(Context *ctx, const std::string &equiv_file_name,
       equiv_file_name.substr(0, std::max(0, (int)equiv_file_name.size() - 21)) +
       circuit_name + ".log";
   // auto preprocessed_graph =
-      // greedy_optimize(ctx, equiv_file_name, false, cost_function);
+  // greedy_optimize(ctx, equiv_file_name, false, cost_function);
   //   return preprocessed_graph->optimize(xfers, cost_upper_bound,
   //   circuit_name,
   //                                       log_file_name, print_message,
   //                                       cost_function, timeout);
-  return optimize(xfers, cost_upper_bound, circuit_name, "",
-                                      print_message, cost_function, timeout);
+  return optimize(xfers, cost_upper_bound, circuit_name, "", print_message,
+                  cost_function, timeout);
 }
 
 std::shared_ptr<Graph>
@@ -2122,7 +2139,7 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
     }
   };
 
-  std::string log = log_str (start, best_cost);
+  std::string log = log_str(start, best_cost);
   while (!candidates.empty()) {
     auto graph = candidates.top();
     candidates.pop();
@@ -2139,7 +2156,7 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
                     .count() /
                 1000.0 >
             timeout) {
-          log += log_str (og_start, best_cost);
+          log += log_str(og_start, best_cost);
           if (print_message) {
             std::cout << log << std::endl;
           }
@@ -2164,7 +2181,7 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
             if (!print_message) {
               start = std::chrono::steady_clock::now();
             }
-            log += log_str (og_start, best_cost);
+            log += log_str(og_start, best_cost);
           }
         } else
           continue;
@@ -2174,11 +2191,11 @@ Graph::optimize(const std::vector<GraphXfer *> &xfers, double cost_upper_bound,
     auto end = std::chrono::steady_clock::now();
   }
   if (print_message) {
-    log += log_str (og_start, best_cost);
+    log += log_str(og_start, best_cost);
     std::cout << log << std::endl;
     // fprintf(fout,
-    //         "[%s] Best cost: %f\tcandidate number: %d\tafter %.3f seconds.\n",
-    //         circuit_name.c_str(), best_cost, candidates.size(),
+    //         "[%s] Best cost: %f\tcandidate number: %d\tafter %.3f
+    //         seconds.\n", circuit_name.c_str(), best_cost, candidates.size(),
     //         (double)std::chrono::duration_cast<std::chrono::milliseconds>(
     //             end - start)
     //                 .count() /
@@ -2530,7 +2547,8 @@ std::shared_ptr<Graph> Graph::apply_xfer(GraphXfer *xfer, Op op,
     new_graph = xfer->create_new_graph(this);
     // auto end_alloc = std::chrono::steady_clock::now();
     // std::cout << "time taken to allocate new graph = " <<
-    // (double)std::chrono::duration_cast<std::chrono::milliseconds>(end_alloc - start_alloc).count()<< std::endl;
+    // (double)std::chrono::duration_cast<std::chrono::milliseconds>(end_alloc -
+    // start_alloc).count()<< std::endl;
 
     if (new_graph->has_loop()) {
       new_graph.reset();
