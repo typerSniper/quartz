@@ -11,7 +11,12 @@ auto nam_set = {GateType::h,          GateType::x,  GateType::rz,
 auto clifft_set = {GateType::t,          GateType::tdg, GateType::h,
                    GateType::s,          GateType::sdg, GateType::cx,
                    GateType::input_qubit};
-auto gate_set = nam_set;
+
+auto ibm_set = {GateType::u1, GateType::u2, GateType::u3, GateType::add,
+                   GateType::cx, GateType::input_qubit, GateType::input_param};
+
+
+auto gate_set = ibm_set;
 // Context gctxt();
 
 // Context ctctxt({GateType::t, GateType::tdg, GateType::h, GateType::s,
@@ -161,12 +166,11 @@ extern "C" void load_xfers_(const char* eqset_fn_, unsigned char** gstore,
   return;
 }
 
-extern "C" int preprocess_(const char* cqasm_, char* buffer, int buff_size) {
+extern "C" int preprocess_ibm_ (const char* cqasm_, char* buffer, int buff_size) {
   std::string cqasm(cqasm_);
-  ParamInfo* param_info = new ParamInfo();
-  Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,
-                   GateType::rz, GateType::input_qubit, GateType::input_param},
-                  param_info);
+  ParamInfo param_info;
+  Context src_ctx({GateType::u1, GateType::u2, GateType::u3, GateType::add, GateType::ccz,
+                   GateType::cx, GateType::input_qubit, GateType::input_param}, &param_info);
 
   QASMParser qasm_parser(&src_ctx);
   CircuitSeq* dag = nullptr;
@@ -175,10 +179,55 @@ extern "C" int preprocess_(const char* cqasm_, char* buffer, int buff_size) {
     return -1;
   }
   auto graph = Graph::from_qasm_str(&src_ctx, cqasm);
-  ParamInfo* param_info2 = new ParamInfo();
+  Context dst_ctx(ibm_set, &param_info);
+
+  auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
+  auto xfer_pair = GraphXfer::ccz_cx_u1_xfer(&src_ctx, &dst_ctx, &union_ctx);
+  auto new_graph = graph->toffoli_flip_greedy(GateType::u1, xfer_pair.first,
+                                              xfer_pair.second);
+  new_graph->constant_and_rotation_elimination();
+
+  std::string new_qasm = new_graph->to_qasm(false, false);
+  return write_qasm_to_buffer(new_qasm, buffer, buff_size);
+
+  // decompose ccz as cx and rz
+  // Context rem_ctx({GateType::u1, GateType::rx, GateType::h, GateType::x,
+  // GateType::rz, GateType::add,
+  //                  GateType::cx, GateType::input_qubit,
+  //                  GateType::input_param});
+  // auto imt_ctx = union_contexts(&src_ctx, &rem_ctx);
+  // // std::cout << "flipping done\n"<<  std::endl;
+
+  // Context dst_ctx(gate_set);
+  // auto uctx = union_contexts(&rem_ctx, &dst_ctx);
+  // // auto y_rule = "y = rz(0.5pi) q0; rz(0.5pi) q0; h q0; rz(0.5pi) q0;
+  // rz(0.5pi) q0; h q0;"; RuleParser rules({"rx q0 p0 = h q0; rz q0 p0; h q0;",
+  // "u1 q0 p0 = rz q0 p0;"}); // TODO: check this.
+  // // std::cout << "contexy shifting " << new_graph->to_qasm (false, false) <<
+  // std::endl; auto fin_graph = new_graph->context_shift(&rem_ctx, &dst_ctx,
+  // &uctx, &rules, false);
+
+  // std::cout << "ruling done\n"<<  std::endl;
+}
+
+
+extern "C" int preprocess_ (const char* cqasm_, char* buffer, int buff_size) {
+  std::string cqasm(cqasm_);
+  ParamInfo param_info;
+  Context src_ctx({GateType::h, GateType::ccz, GateType::x, GateType::cx,
+                   GateType::rz, GateType::input_qubit, GateType::input_param},
+                  &param_info);
+
+  QASMParser qasm_parser(&src_ctx);
+  CircuitSeq* dag = nullptr;
+  if (!qasm_parser.load_qasm_str(cqasm, dag)) {
+    std::cout << "Parser failed" << std::endl;
+    return -1;
+  }
+  auto graph = Graph::from_qasm_str(&src_ctx, cqasm);
   Context dst_ctx({GateType::h, GateType::x, GateType::rz, GateType::add,
                    GateType::cx, GateType::input_qubit, GateType::input_param},
-                  param_info2);
+                  &param_info);
 
   auto union_ctx = union_contexts(&src_ctx, &dst_ctx);
   auto xfer_pair = GraphXfer::ccz_cx_rz_xfer(&src_ctx, &dst_ctx, &union_ctx);
@@ -224,10 +273,10 @@ extern "C" int opt_circuit_(const char* cqasm_, int timeout, char* buffer,
     ParamInfo* param_info = new ParamInfo();
     ctxt = new Context(gate_set, param_info);
   } else {
-    std::cout << "reusing context\n";
     ctxt = xfers[0]->dst_ctx_;
   }
-  std::cout << "pinfo " << ctxt->param_info_to_json() << std::endl;
+
+
   auto graph = Graph::from_qasm_str(ctxt, cqasm);
 
   auto start = std::chrono::steady_clock::now();
@@ -237,17 +286,8 @@ extern "C" int opt_circuit_(const char* cqasm_, int timeout, char* buffer,
   // /*print_message=*/ false);
   std::cout << "timeout received = " << timeout << std::endl;
   std::shared_ptr<Graph> graph_after_search;
-  std::shared_ptr<Graph> graph_after_search2;
-  timeout = 0;
   if (timeout == 0) {
-    std::cout << "calling here\n";
-    graph_after_search =
-        graph->greedy_optimize(ctxt, "lib/quartz/Nam_6_3_complete_ECC_set.json",
-                               /*print_message=*/false, gcost_function);
-    std::cout << "pinfo " << ctxt->param_info_to_json() << std::endl;
-
-    graph_after_search = graph->greedy_optimize_with_xfers(
-        ctxt, xfers, /*print_message=*/false, gcost_function);
+    graph_after_search = graph->greedy_optimize_with_xfers(ctxt, xfers, /*print_message=*/false, gcost_function);
   } else if (timeout < 0) {
     graph_after_search = graph->greedy_optimize_with_xfers(
         ctxt, xfers, /*print_message=*/false, gcost_function, -1 * timeout);
@@ -261,9 +301,7 @@ extern "C" int opt_circuit_(const char* cqasm_, int timeout, char* buffer,
   auto end = std::chrono::steady_clock::now();
 
   std::cout << " Cost function optimized from: " << gcost_function(graph.get())
-            << " to " << gcost_function(graph_after_search.get())
-            << ", "
-            // << "third = " << gcost_function(graph_after_search2.get()) << " "
+            << " to " << gcost_function(graph_after_search.get()) << ", "
             << (double)std::chrono::duration_cast<std::chrono::milliseconds>(
                    end - start)
                        .count() /
@@ -281,7 +319,6 @@ extern "C" int opt_circuit_(const char* cqasm_, int timeout, char* buffer,
   }
 
   *xfers_ptr = xfers;
-  exit(1);
   return write_qasm_to_buffer(cqasm2, buffer, buff_size);
   // std::cout << "circuit after opt = ";
   // std::cout << cqasm2.c_str() << std::endl;

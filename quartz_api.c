@@ -8,9 +8,13 @@ int opt_circuit(const char* cqasm, int timeout, char* buffer, int buff_size, uns
   return res;
 }
 
-
 int preprocess(const char* cqasm, char* buffer, int buff_size) {
   int res = preprocess_ (cqasm, buffer, buff_size);
+  return res;
+}
+
+int preprocess_ibm(const char* cqasm, char* buffer, int buff_size) {
+  int res = preprocess_ibm_ (cqasm, buffer, buff_size);
   return res;
 }
 

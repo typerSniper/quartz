@@ -1625,6 +1625,7 @@ std::shared_ptr<Graph> Graph::greedy_optimize_with_xfers(
   auto start = og_start;
   std::string log = log_str(og_start, original_cost);
   double apply_xfer_time = 0;
+  auto cc = original_cost;
   do {
     optimized_in_this_iteration = false;
     for (auto it = xfers.begin(); it != xfers.end(); ++it) {
@@ -1643,7 +1644,8 @@ std::shared_ptr<Graph> Graph::greedy_optimize_with_xfers(
                 end_apply_xfer - start_apply_xfer)
                 .count();
         num_visits++;
-        if (new_graph) {
+        if (new_graph && cost_function(new_graph.get()) < cc) {
+          cc = cost_function(new_graph.get());
           optimized_graph.swap(new_graph);
           // Update the wires after applying a transformation.
           all_nodes.clear();
@@ -1652,7 +1654,6 @@ std::shared_ptr<Graph> Graph::greedy_optimize_with_xfers(
           optimized_in_this_iteration = true;
           start = std::chrono::steady_clock::now();
           if (print_message) {
-            auto cc = cost_function(optimized_graph.get());
             log += log_str(og_start, cc);
           }
           // Since |all_nodes| has changed, we cannot continue this loop.
