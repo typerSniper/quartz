@@ -55,8 +55,9 @@ int main(int argc, char **argv) {
              input_fn, output_fn, eqset_fn);
   auto fn = input_fn.substr(input_fn.rfind('/') + 1);
 
+  ParamInfo param_info;
   // Construct contexts
-  Context src_ctx(clifft_set);
+  Context src_ctx(clifft_set, &param_info);
   // Load qasm file
   QASMParser qasm_parser(&src_ctx);
   CircuitSeq *dag = nullptr;
